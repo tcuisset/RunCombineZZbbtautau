@@ -1,5 +1,9 @@
 import os,json
 
+# comb_options = '--minimizerAlgo Minuit2'
+# comb_options = '-cminDefaultMinimizerType Minuit2'
+comb_options = ''
+
 def parseFile(filename, CL='50.0', exp=True):
     f = open(filename)
     matches = []
@@ -37,7 +41,7 @@ def run_single_limit(maindir, ch, feat, ver, mass, run):
     if run:
         # Run asymptotic limit
         print(" ### INFO: Run Asymptotic limit")
-        cmd = f'combine -M AsymptoticLimits {feat}_{ch}_os_iso.txt --run blind --noFitAsimov &> combine.log'
+        cmd = f'combine -M AsymptoticLimits {feat}_{ch}_os_iso.txt --run blind --noFitAsimov {comb_options} &> combine.log'
         os.chdir(odir)
         os.system(cmd)
 
@@ -84,7 +88,7 @@ def run_comb_limit(maindir, feat, ver, mass, run):
 
     # Run asymptotic limit
     print(" ### INFO: Run Asymptotic limit")
-    cmd = f'combine -M AsymptoticLimits {feat}_comb_os_iso.txt --run blind --noFitAsimov &> combine.log'
+    cmd = f'combine -M AsymptoticLimits {feat}_comb_os_iso.txt --run blind --noFitAsimov {comb_options} &> combine.log'
     os.chdir(odir)
     os.system(cmd)
 
@@ -115,19 +119,24 @@ if __name__ == "__main__" :
     parser = OptionParser()
     parser.add_option("--run",     dest="run",      default=True)
     parser.add_option("--feat",    dest="feat",     default='ZZKinFit_mass')
-    parser.add_option("--ver",     dest="ver",      default='prod_231129_M300')
-    parser.add_option("--mass",    dest="mass",     default='300')
+    parser.add_option("--ver",     dest="ver",      default='prod_231129')
+    parser.add_option("--mass",    dest="mass",     default='200,300,400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,2000,3000')
     (options, args) = parser.parse_args()
 
     run = options.run
     feat = options.feat
     ver = options.ver
-    mass = options.mass
+    if ',' in options.mass:
+        mass_points = options.mass.split(',')
+    else:
+        mass_points = [options.mass]
 
     maindir = os.getcwd() + '/ResLimits'
     os.system('mkdir -p ' + maindir)
 
-    for ch in ['etau', 'mutau', 'tautau']:
-        run_single_limit(maindir, ch, feat, ver, mass, run)
-    
-    run_comb_limit(maindir, feat, ver, mass, run)
+    for mass in mass_points:
+        mass_ver = ver + f'_M{mass}'
+        for ch in ['etau', 'mutau', 'tautau']:
+            run_single_limit(maindir, ch, feat, mass_ver, mass, run)
+
+        run_comb_limit(maindir, feat, mass_ver, mass, run)

@@ -7,16 +7,23 @@ if __name__ == "__main__" :
 
     from optparse import OptionParser
     parser = OptionParser()
+    parser.add_option("--mass",    dest="mass",     default='200,300,400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,2000,3000')
     parser.add_option("--dirs",    dest="dirs",     default='prod_231129_M900')
     parser.add_option("--feat",    dest="feat",     default='ZZKinFit_mass')
     parser.add_option("--ver",     dest="ver",      default='prod_231129')
     parser.add_option("--ch",      dest="ch",       default='combination')
     (options, args) = parser.parse_args()
 
-    dirs = options.dirs.split(',') if ',' in options.dirs else [options.dirs]
+    if ',' in options.mass:
+        mass_points = options.mass.split(',')
+    else:
+        mass_points = [options.mass]
+    
     feat = options.feat
     ver = options.ver
     ch = options.ch
+
+    dirs = [f'{ver}_M{mass}' for mass in mass_points]
 
     maindir = os.getcwd() + '/ResLimits'
     os.system('mkdir -p ' + maindir)
@@ -99,7 +106,9 @@ if __name__ == "__main__" :
     canvas.SetGridy()
 
     # Outside frame
-    frame_bounds = 170, 1030
+    x_min = np.min(mass) - 30
+    x_max = np.max(mass) + 30
+    frame_bounds = x_min, x_max
     hframe = ROOT.TH1F('hframe', '',
                        100, frame_bounds[0], frame_bounds[1])
     hframe.SetMinimum(0.1)
@@ -116,6 +125,25 @@ if __name__ == "__main__" :
     hframe.SetStats(0)
     ROOT.gPad.SetTicky()
     hframe.Draw()
+
+    ptext1 = ROOT.TPaveText(0.1663218-0.02, 0.886316, 0.3045977-0.02, 0.978947, 'brNDC')
+    ptext1.SetBorderSize(0)
+    ptext1.SetTextAlign(12)
+    ptext1.SetTextFont(62)
+    ptext1.SetTextSize(0.05)
+    ptext1.SetFillColor(0)
+    ptext1.SetFillStyle(0)
+    ptext1.AddText('CMS #font[52]{Internal}')
+    ptext1.Draw()
+
+    ptext2 = ROOT.TPaveText(0.74, 0.91, 0.85, 0.95, 'brNDC')
+    ptext2.SetBorderSize(0)
+    ptext2.SetFillColor(0)
+    ptext2.SetTextSize(0.040)
+    ptext2.SetTextFont(42)
+    ptext2.SetFillStyle(0)
+    ptext2.AddText('2018 - 59.7 fb^{-1} (13 TeV)')
+    ptext2.Draw()
 
     legend = ROOT.TLegend(0.7,0.7,0.9,0.89)
     legend.SetBorderSize(0)

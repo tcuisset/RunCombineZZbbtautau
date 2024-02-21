@@ -1,7 +1,7 @@
 import os,json
 
 # comb_options = '--minimizerAlgo Minuit2'
-# comb_options = '-cminDefaultMinimizerType Minuit2'
+# comb_options = '--cminDefaultMinimizerType Minuit2'
 comb_options = ''
 
 def parseFile(filename, CL='50.0', exp=True):

@@ -1,4 +1,4 @@
-import os,json
+import os,json,concurrent.futures
 
 # comb_options = '--minimizerAlgo Minuit2'
 # comb_options = '--cminDefaultMinimizerType Minuit2'
@@ -23,12 +23,12 @@ def parseFile(filename, CL='50.0', exp=True):
     else:
         return matches[-1]
 
-def run_single_limit(maindir, ch, feat, ver, mass, run):
+def run_single_limit(maindir, config, base_cat, process_group_name, ch, feat, ver, mass, run):
 
-    basedir = '/data_CMS/cms/vernazza/cmt/CreateDatacards/'
-    datadir = basedir + f'/ul_2018_ZZ_v10/cat_ZZ_elliptical_cut_80_{ch}/{ver}'
-    datafile = datadir + f'/{feat}_{ch}_os_iso.txt'
-    rootfile = datadir + f'/{feat}_{ch}_os_iso.root'
+    basedir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
+    datadir = basedir + f'/{config}/cat_{base_cat}_{ch}/{ver}'
+    datafile = datadir + f'/{feat}_{process_group_name}_{ch}_os_iso.txt'
+    rootfile = datadir + f'/{feat}_{process_group_name}_{ch}_os_iso.root'
 
     # Define output directory
     odir = maindir + f'/{ver}/{ch}/{feat}'
@@ -36,7 +36,8 @@ def run_single_limit(maindir, ch, feat, ver, mass, run):
     os.system('mkdir -p ' + odir)
 
     # Get datacards
-    os.system('cp '+datafile+' '+rootfile+' '+odir)
+    os.system(f'cp {datafile} {odir}/{feat}_{ch}_os_iso.txt')
+    os.system(f'cp {rootfile} {odir}/{feat}_{ch}_os_iso.root')
 
     if run:
         # Run asymptotic limit
@@ -82,7 +83,7 @@ def run_comb_limit(maindir, feat, ver, mass, run):
         os.system('cp '+datafile+' '+rootfile+' '+odir)
 
     # Combine datacards
-    cmd = f'combineCards.py ch1={feat}_etau_os_iso.txt ch2={feat}_mutau_os_iso.txt ch3={feat}_tautau_os_iso.txt > {feat}_comb_os_iso.txt'
+    cmd = f'combineCards.py ch_etau={feat}_etau_os_iso.txt ch_mutau={feat}_mutau_os_iso.txt ch_tautau={feat}_tautau_os_iso.txt > {feat}_comb_os_iso.txt'
     os.chdir(odir)
     os.system(cmd)
 
@@ -118,7 +119,11 @@ if __name__ == "__main__" :
     from optparse import OptionParser
     parser = OptionParser()
     parser.add_option("--run",     dest="run",      default=True)
+    parser.add_option("--config", help="Configuration name (ex : ul_2018_ZZ_v12)")
+    parser.add_option("--category", help="Category name (ex : ZbbHtt_elliptical_cut_90) to fetch Datacards from")
+    parser.add_option("--process-group-name", help="Value of process_group_name used to make datacards (ex : datacard_ZbbHtt_res)")
     parser.add_option("--feat",    dest="feat",     default='ZZKinFit_mass')
+    parser.add_option("--featureDependsOnMass", help="Add _$MASS to name of feature for each mass -> for parametrized DNN", action="store_true", default=False)
     parser.add_option("--ver",     dest="ver",      default='prod_231129')
     parser.add_option("--mass",    dest="mass",     default='200,300,400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,2000,3000')
     (options, args) = parser.parse_args()
@@ -131,12 +136,17 @@ if __name__ == "__main__" :
     else:
         mass_points = [options.mass]
 
-    maindir = os.getcwd() + '/ResLimits'
+    maindir = os.getcwd() + f'/ResLimits/{options.config}'
     os.system('mkdir -p ' + maindir)
 
-    for mass in mass_points:
+    def processMapPoint(mass):
         mass_ver = ver + f'_M{mass}'
+        feat_ver = feat + f'_{mass}' if options.featureDependsOnMass else feat
         for ch in ['etau', 'mutau', 'tautau']:
-            run_single_limit(maindir, ch, feat, mass_ver, mass, run)
+            run_single_limit(maindir, options.config, options.category, options.process_group_name, ch, feat_ver, mass_ver, mass, run)
 
-        run_comb_limit(maindir, feat, mass_ver, mass, run)
+        run_comb_limit(maindir, feat_ver, mass_ver, mass, run)
+    
+    # set max_workers=1 for debugging
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as exc:
+        exc.map(processMapPoint, mass_points)

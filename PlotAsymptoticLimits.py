@@ -7,9 +7,10 @@ if __name__ == "__main__" :
 
     from optparse import OptionParser
     parser = OptionParser()
+    parser.add_option("--config", help="Configuration name (ex : ul_2018_ZZ_v12)")
     parser.add_option("--mass",    dest="mass",     default='200,300,400,500,600,700,800,900,1000,1100,1200,1300,1400,1500,2000,3000')
-    parser.add_option("--dirs",    dest="dirs",     default='prod_231129_M900')
     parser.add_option("--feat",    dest="feat",     default='ZZKinFit_mass')
+    parser.add_option("--featureDependsOnMass", help="Add _$MASS to name of feature for each mass -> for parametrized DNN", action="store_true", default=False)
     parser.add_option("--ver",     dest="ver",      default='prod_231129')
     parser.add_option("--ch",      dest="ch",       default='combination')
     (options, args) = parser.parse_args()
@@ -37,12 +38,13 @@ if __name__ == "__main__" :
     m2s_t = []
     p2s_t = []
 
-    for dir in dirs:
-
-        limit_file = maindir + f'/{dir}/{ch}/{feat}/limits.json'
+    for dir, mass_fromDir in zip(dirs, mass_points):
+        feat_ver = f'{feat}_{mass_fromDir}' if options.featureDependsOnMass else feat
+        limit_file = maindir + f'/{options.config}/{dir}/{ch}/{feat_ver}/limits.json'
         with open(limit_file, 'r') as json_file:
             mass_dict = json.load(json_file)
         m = list(mass_dict.keys())[0]
+        assert mass_fromDir == m
         mass.append(m)
         exp.append(mass_dict[m]['exp'])
         m1s_t.append(mass_dict[m]['m1s_t'])
@@ -120,7 +122,15 @@ if __name__ == "__main__" :
     hframe.GetXaxis().SetLabelOffset(0.012)
     hframe.GetYaxis().SetTitleOffset(1.2)
     hframe.GetXaxis().SetTitleOffset(1.1)
-    hframe.GetYaxis().SetTitle("95% CL on #sigma #times #bf{#it{#Beta}}(X#rightarrowZZ#rightarrow bb#tau#tau) [pb]")
+    if "ZZ" in options.config:
+        process_tex = "X#rightarrowZZ#rightarrow bb#tau#tau"
+    elif "ZbbHtt" in options.config:
+        process_tex = "Z'#rightarrowZH#rightarrow bb#tau#tau"
+    elif "ZttHbb" in options.config:
+        process_tex = "Z'#rightarrowZH#rightarrow #tau#tau bb"
+    else:
+        process_tex = "unknown process"
+    hframe.GetYaxis().SetTitle("95% CL on #sigma #times #bf{#it{#Beta}}(" + process_tex + ") [pb]")
     hframe.GetXaxis().SetTitle("m_{X} [GeV]")
     hframe.SetStats(0)
     ROOT.gPad.SetTicky()
@@ -159,6 +169,6 @@ if __name__ == "__main__" :
 
     legend.Draw()
 
-    save_name = maindir + f'/Limits_'+feat+'_'+ver+'_'+ch
+    save_name = maindir + f'/{options.config}/Limits_'+feat+'_'+ver+'_'+ch
     canvas.SaveAs(save_name+'.png')
     canvas.SaveAs(save_name+'.pdf')

@@ -2,6 +2,8 @@ import os,sys,pdb
 import ROOT
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import mplhep
 plt.style.use(mplhep.style.CMS)
 ROOT.gROOT.SetBatch(True)
@@ -78,7 +80,7 @@ if __name__ == "__main__" :
             print(" ### INFO: Saving combination in ", combdir)
             if run: os.system('mkdir -p ' + combdir)
 
-            cmtdir = '/data_CMS/cms/vernazza/cmt/CreateDatacards/'
+            cmtdir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
 
             etau_file = ''; mutau_file = ''; tautau_file = ''
             for category in categories:
@@ -114,19 +116,28 @@ if __name__ == "__main__" :
             datacard_list.append(f'{combdir}/{version}_{feature}_os_iso.txt')
             root_list.append([etau_root, mutau_root, tautau_root])
 
+            if "ZZ" in version:
+                r_range = "--rMin 0 --rMax 2"
+                r_range_setPR = "--setParameterRanges r=0,2"
+            elif "ZbbHtt" in version or "ZttHbb" in version:
+                r_range = "--rMin -10 --rMax 15"
+                r_range_setPR = "--setParameterRanges r=-10,15"
+            else:
+                raise ValueError("COuld not determine ZZ or ZH analysis")
+        
             cmd = f'text2workspace.py {version}_{feature}_os_iso.txt -o model.root'
             if run: os.system(cmd)
-            cmd = 'combine -M MultiDimFit model.root --algo=singles --rMin 0 --rMax 2 --preFitValue 1 --expectSignal 1 -t -1'
+            cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
             if run: os.system(cmd)
-            cmd = 'combine -M MultiDimFit model.root --algo=grid --points 100 --rMin 0 --rMax 2 --preFitValue 1 --expectSignal 1 -t -1'
+            cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
             if run: os.system(cmd)
             cmd = f'combine -M Significance {version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance.log'
             if run: os.system(cmd)
 
-            cmd = 'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst --setParameterRanges r=0,2 --saveWorkspace'\
+            cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
                 ' --preFitValue 1 --expectSignal 1 -t -1'
             if run: os.system(cmd)
-            cmd = 'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root --setParameterRanges r=0,2 '\
+            cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
                 '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
                 '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances'
             if run: os.system(cmd)
@@ -142,8 +153,8 @@ if __name__ == "__main__" :
                 to_draw_etau = ROOT.TString("2*deltaNLL:r")
                 n_etau = limit_etau.Draw( to_draw_etau.Data(), "", "l")
 
-                x_etau = np.array(np.ndarray((n_etau), 'd', limit_etau.GetV2())[30:70])
-                y_etau = np.array(np.ndarray((n_etau), 'd', limit_etau.GetV1())[30:70])
+                x_etau = np.array(np.ndarray((n_etau), 'd', limit_etau.GetV2())[1:])
+                y_etau = np.array(np.ndarray((n_etau), 'd', limit_etau.GetV1())[1:])
 
                 LS_file = basedir + f'/NonRes/{version}/{prd}/{feature}/etau/higgsCombineTest.Significance.mH120.significance.root'
                 f = ROOT.TFile(LS_file)
@@ -163,8 +174,8 @@ if __name__ == "__main__" :
                 to_draw_mutau = ROOT.TString("2*deltaNLL:r")
                 n_mutau = limit_mutau.Draw( to_draw_mutau.Data(), "", "l")
 
-                x_mutau = np.array(np.ndarray((n_mutau), 'd', limit_mutau.GetV2())[30:70])
-                y_mutau = np.array(np.ndarray((n_mutau), 'd', limit_mutau.GetV1())[30:70])
+                x_mutau = np.array(np.ndarray((n_mutau), 'd', limit_mutau.GetV2())[1:])
+                y_mutau = np.array(np.ndarray((n_mutau), 'd', limit_mutau.GetV1())[1:])
 
                 LS_file = basedir + f'/NonRes/{version}/{prd}/{feature}/mutau/higgsCombineTest.Significance.mH120.significance.root'
                 f = ROOT.TFile(LS_file)
@@ -184,8 +195,8 @@ if __name__ == "__main__" :
                 to_draw_tautau = ROOT.TString("2*deltaNLL:r")
                 n_tautau = limit_tautau.Draw( to_draw_tautau.Data(), "", "l")
 
-                x_tautau = np.array(np.ndarray((n_tautau), 'd', limit_tautau.GetV2())[30:70])
-                y_tautau = np.array(np.ndarray((n_tautau), 'd', limit_tautau.GetV1())[30:70])
+                x_tautau = np.array(np.ndarray((n_tautau), 'd', limit_tautau.GetV2())[1:])
+                y_tautau = np.array(np.ndarray((n_tautau), 'd', limit_tautau.GetV1())[1:])
 
                 LS_file = basedir + f'/NonRes/{version}/{prd}/{feature}/tautau/higgsCombineTest.Significance.mH120.significance.root'
                 f = ROOT.TFile(LS_file)
@@ -204,8 +215,8 @@ if __name__ == "__main__" :
             to_draw_comb = ROOT.TString("2*deltaNLL:r")
             n_comb = limit_comb.Draw( to_draw_comb.Data(), "", "l")
 
-            x_comb = np.array(np.ndarray((n_comb), 'd', limit_comb.GetV2())[30:70])
-            y_comb = np.array(np.ndarray((n_comb), 'd', limit_comb.GetV1())[30:70])
+            x_comb = np.array(np.ndarray((n_comb), 'd', limit_comb.GetV2())[1:])
+            y_comb = np.array(np.ndarray((n_comb), 'd', limit_comb.GetV1())[1:])
 
             LS_file_comb_stat = combdir + f'/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
             f_comb_stat= ROOT.TFile(LS_file_comb_stat)
@@ -213,8 +224,8 @@ if __name__ == "__main__" :
             to_draw_comb_stat = ROOT.TString("2*deltaNLL:r")
             n_comb_stat = limit_comb_stat.Draw( to_draw_comb_stat.Data(), "", "l")
 
-            x_comb_stat = np.array(np.ndarray((n_comb_stat), 'd', limit_comb_stat.GetV2())[30:70])
-            y_comb_stat = np.array(np.ndarray((n_comb_stat), 'd', limit_comb_stat.GetV1())[30:70])
+            x_comb_stat = np.array(np.ndarray((n_comb_stat), 'd', limit_comb_stat.GetV2())[1:])
+            y_comb_stat = np.array(np.ndarray((n_comb_stat), 'd', limit_comb_stat.GetV1())[1:])
 
             LS_file_comb_list.append(LS_file_comb)
 
@@ -243,7 +254,12 @@ if __name__ == "__main__" :
             plt.text(x=x_mutau[0], y=1.1, s="68% C.L.", fontsize="x-small")
             plt.text(x=x_mutau[0], y=3.94, s="95% C.L.", fontsize="x-small")
             plt.legend(fontsize=20, loc='upper right', frameon=True)
-            plt.ylim(-0.05, 1.1*np.max(y_comb))
+            if "ZZ" in version:
+                plt.xlim(0,2)
+                plt.ylim(-0.05, 1.1*np.max(y_comb))
+            elif "ZbbHtt" in version or "ZttHbb" in version:
+                plt.xlim(-10, 15)
+                plt.ylim(-0.05, 6)
             # mplhep.cms.label(data=False, rlabel='2018, (13.6 TeV) 59.7 $fb^{-1}$', fontsize=20)
             mplhep.cms.label(data=False, rlabel='(13 TeV)', fontsize=20)
             plt.grid()
@@ -267,14 +283,23 @@ if __name__ == "__main__" :
             text2 = fr"$\sigma = {{{r}}}^{{+{up_syst}}}_{{-{down_syst}}}(syst)^{{+{up_stat}}}_{{-{down_stat}}}(stat)$ pb"
             plt.text(.02, .92, text2, ha='left', va='top', transform=ax.transAxes, fontsize='small', 
                     bbox=dict(facecolor='white', alpha=0.6, edgecolor='none'))
-            plt.xlabel(r'$\sigma\;(ZZ \rightarrow bb\tau\tau)$ [pb]')
+            if "ZZ" in version:
+                plt.xlabel(r'$\sigma\;(ZZ \rightarrow bb\tau\tau)$ [pb]')
+            elif "ZbbHtt" in version:
+                plt.xlabel(r'$\sigma\;(ZH \rightarrow bb\tau\tau)$ [pb]')
+            elif "ZttHbb" in version:
+                plt.xlabel(r'$\sigma\;(ZH \rightarrow \tau\tau bb)$ [pb]')
             plt.ylabel(r'-2$\Delta$ LL')
             plt.axhline(y=1, color='black', linestyle='--', alpha=0.5)
             plt.axhline(y=3.84, color='black', linestyle='--', alpha=0.5)
             plt.text(x=xs*x_mutau[0], y=1.1, s="68% C.L.", fontsize="x-small")
             plt.text(x=xs*x_mutau[0], y=3.94, s="95% C.L.", fontsize="x-small")
             plt.legend(fontsize=20, loc='upper right', frameon=True)
-            plt.ylim(-0.05, 1.1*np.max(y_comb))
+            if "ZZ" in version:
+                plt.ylim(-0.05, 1.1*np.max(y_comb))
+            elif "ZbbHtt" in version or "ZttHbb" in version:
+                plt.ylim(-0.05, 6)
+            
             # mplhep.cms.label(data=False, rlabel='2018, (13.6 TeV) 59.7 $fb^{-1}$', fontsize=20)
             mplhep.cms.label(data=False, rlabel='(13 TeV)', fontsize=20)
             plt.grid()
@@ -318,7 +343,7 @@ if __name__ == "__main__" :
         
         # combine all years for the same feature
             
-        combdir_run2 = basedir + f'/NonRes/FullRun2/{prd}/{feature}/Combination'
+        combdir_run2 = basedir + f'/NonRes/FullRun2/{grp}/{prd}/{feature}/Combination'
         os.system(f'mkdir -p {combdir_run2}')
             
         cmd = 'combineCards.py'
@@ -331,19 +356,26 @@ if __name__ == "__main__" :
         if run: os.chdir(combdir_run2)
         if run: os.system(cmd)
 
+        if "ZZ" in version:
+            r_range = "--rMin 0 --rMax 2"
+            r_range_setPR = "--setParameterRanges r=0,2"
+        elif "ZbbHtt" in version or "ZttHbb" in version:
+            r_range = "--rMin -10 --rMax 15"
+            r_range_setPR = "--setParameterRanges r=-10,15"
+
         cmd = f'text2workspace.py FullRun2_{feature}_os_iso.txt -o model.root'
         if run: os.system(cmd)
-        cmd = 'combine -M MultiDimFit model.root --algo=singles --rMin 0 --rMax 2 --preFitValue 1 --expectSignal 1 -t -1'
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
-        cmd = 'combine -M MultiDimFit model.root --algo=grid --points 100 --rMin 0 --rMax 2 --preFitValue 1 --expectSignal 1 -t -1'
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
         cmd = f'combine -M Significance FullRun2_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance.log'
         if run: os.system(cmd)
 
-        cmd = 'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst --setParameterRanges r=0,2 --saveWorkspace'\
+        cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
-        cmd = 'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root --setParameterRanges r=0,2 '\
+        cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances'
         if run: os.system(cmd)
@@ -355,29 +387,29 @@ if __name__ == "__main__" :
         limit_1 = f_1.Get("limit")
         to_draw_1 = ROOT.TString("2*deltaNLL:r")
         n_1 = limit_1.Draw( to_draw_1.Data(), "", "l")
-        x_1 = np.array(np.ndarray((n_1), 'd', limit_1.GetV2())[30:70])
-        y_1 = np.array(np.ndarray((n_1), 'd', limit_1.GetV1())[30:70])
+        x_1 = np.array(np.ndarray((n_1), 'd', limit_1.GetV2())[1:])
+        y_1 = np.array(np.ndarray((n_1), 'd', limit_1.GetV1())[1:])
         LS_file_2 = LS_file_comb_list[1]
         f_2= ROOT.TFile(LS_file_2)
         limit_2 = f_2.Get("limit")
         to_draw_2 = ROOT.TString("2*deltaNLL:r")
         n_2 = limit_2.Draw( to_draw_2.Data(), "", "l")
-        x_2 = np.array(np.ndarray((n_2), 'd', limit_2.GetV2())[30:70])
-        y_2 = np.array(np.ndarray((n_2), 'd', limit_2.GetV1())[30:70])
+        x_2 = np.array(np.ndarray((n_2), 'd', limit_2.GetV2())[1:])
+        y_2 = np.array(np.ndarray((n_2), 'd', limit_2.GetV1())[1:])
         LS_file_3 = LS_file_comb_list[2]
         f_3= ROOT.TFile(LS_file_3)
         limit_3 = f_3.Get("limit")
         to_draw_3 = ROOT.TString("2*deltaNLL:r")
         n_3 = limit_3.Draw( to_draw_3.Data(), "", "l")
-        x_3 = np.array(np.ndarray((n_3), 'd', limit_3.GetV2())[30:70])
-        y_3 = np.array(np.ndarray((n_3), 'd', limit_3.GetV1())[30:70])
+        x_3 = np.array(np.ndarray((n_3), 'd', limit_3.GetV2())[1:])
+        y_3 = np.array(np.ndarray((n_3), 'd', limit_3.GetV1())[1:])
         LS_file_4 = LS_file_comb_list[3]
         f_4= ROOT.TFile(LS_file_4)
         limit_4 = f_4.Get("limit")
         to_draw_4 = ROOT.TString("2*deltaNLL:r")
         n_4 = limit_4.Draw( to_draw_4.Data(), "", "l")
-        x_4 = np.array(np.ndarray((n_4), 'd', limit_4.GetV2())[30:70])
-        y_4 = np.array(np.ndarray((n_4), 'd', limit_4.GetV1())[30:70])
+        x_4 = np.array(np.ndarray((n_4), 'd', limit_4.GetV2())[1:])
+        y_4 = np.array(np.ndarray((n_4), 'd', limit_4.GetV1())[1:])
 
         LS_file_run2 = combdir_run2 + f'/higgsCombineTest.MultiDimFit.mH120.root'
         f_run2= ROOT.TFile(LS_file_run2)
@@ -385,8 +417,8 @@ if __name__ == "__main__" :
         to_draw_run2 = ROOT.TString("2*deltaNLL:r")
         n_run2 = limit_run2.Draw( to_draw_run2.Data(), "", "l")
 
-        x_run2 = np.array(np.ndarray((n_run2), 'd', limit_run2.GetV2())[30:70])
-        y_run2 = np.array(np.ndarray((n_run2), 'd', limit_run2.GetV1())[30:70])
+        x_run2 = np.array(np.ndarray((n_run2), 'd', limit_run2.GetV2())[1:])
+        y_run2 = np.array(np.ndarray((n_run2), 'd', limit_run2.GetV1())[1:])
 
         LS_file_run2_stat = combdir_run2 + f'/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
         f_run2_stat= ROOT.TFile(LS_file_run2_stat)
@@ -394,8 +426,8 @@ if __name__ == "__main__" :
         to_draw_run2_stat = ROOT.TString("2*deltaNLL:r")
         n_run2_stat = limit_run2_stat.Draw( to_draw_run2_stat.Data(), "", "l")
 
-        x_run2_stat = np.array(np.ndarray((n_run2_stat), 'd', limit_run2_stat.GetV2())[30:70])
-        y_run2_stat = np.array(np.ndarray((n_run2_stat), 'd', limit_run2_stat.GetV1())[30:70])
+        x_run2_stat = np.array(np.ndarray((n_run2_stat), 'd', limit_run2_stat.GetV2())[1:])
+        y_run2_stat = np.array(np.ndarray((n_run2_stat), 'd', limit_run2_stat.GetV1())[1:])
 
         f, ax = plt.subplots(figsize = [10,10])
         plt.plot(x_1, y_1, linewidth=2, label=r'2016')
@@ -419,7 +451,12 @@ if __name__ == "__main__" :
         plt.text(x=x_1[0], y=1.1, s="68% C.L.", fontsize="x-small")
         plt.text(x=x_1[0], y=3.94, s="95% C.L.", fontsize="x-small")
         plt.legend(fontsize=20, loc='upper right', frameon=True)
-        plt.ylim(-0.05, 1.1*np.max(y_1))
+        if "ZZ" in version:
+            plt.xlim(0,2)
+            plt.ylim(-0.05, 1.1*np.max(y_comb))
+        elif "ZbbHtt" in version or "ZttHbb" in version:
+            plt.xlim(-10, 15)
+            plt.ylim(-0.05, 6)
         # mplhep.cms.label(data=False, rlabel='2018, (13.6 TeV) 59.7 $fb^{-1}$', fontsize=20)
         mplhep.cms.label(data=False, rlabel='(13 TeV)', fontsize=20)
         plt.grid()
@@ -430,9 +467,9 @@ if __name__ == "__main__" :
         plt.close() 
 
         print(" ### INFO: Produce Full Run 2 impact plots")
-        cmd = 'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 --setParameterRanges r=0,2 --doInitialFit --robustFit 1'
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1'
         if run: os.system(cmd)
-        cmd = 'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 --setParameterRanges r=0,2 --doFits --robustFit 1'
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1'
         if run: os.system(cmd)
         cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json'
         if run: os.system(cmd)

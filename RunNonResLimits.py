@@ -1,6 +1,7 @@
 import os,sys
 import ROOT
 import numpy as np
+import concurrent.futures
 ROOT.gROOT.SetBatch(True)
 
 #######################################################################
@@ -41,6 +42,7 @@ if __name__ == "__main__" :
     parser.add_option("--prd",     dest="prd",      default='')
     parser.add_option("--feat",    dest="feat",     default='dnn_ZZbbtt_kl_1')
     parser.add_option("--grp",     dest="grp",      default='datacard_zz')
+    parser.add_option("--singleThread", action="store_false", help="Don't run in parallel, disable for debugging")
     (options, args) = parser.parse_args()
 
     if ',' in options.ver:
@@ -61,132 +63,142 @@ if __name__ == "__main__" :
     prd = options.prd
     grp = options.grp
 
-    basedir = '/data_CMS/cms/vernazza/cmt/CreateDatacards/'
+    basedir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
     maindir = os.getcwd() 
 
-    for feature in features:
 
-        for version in versions:        
+    def run_limit(feature, version, category):
+        if 'etau' in category:      ch = 'etau'
+        if 'mutau' in category:     ch = 'mutau'
+        if 'tautau' in category:    ch = 'tautau'
+        odir = maindir + f'/NonRes/{version}/{prd}/{feature}'
+        datadir = basedir + f'/{version}/{category}/{prd}'
+        datafile = datadir + f'{feature}_{grp}_{ch}_os_iso.txt'
+        run = int(options.run) == 1
 
-            odir = maindir + f'/NonRes/{version}/{prd}/{feature}'
-            print(" ### INFO: Saving output in ", odir)
-            os.system('mkdir -p ' + odir)
+        ch_dir = odir + f'/{ch}'
+        os.system('mkdir -p ' + ch_dir)
 
-            for category in categories:
-                if 'etau' in category:      ch = 'etau'
-                if 'mutau' in category:     ch = 'mutau'
-                if 'tautau' in category:    ch = 'tautau'
-                datadir = basedir + f'/{version}/{category}/{prd}'
-                datafile = datadir + f'{feature}_{grp}_{ch}_os_iso.txt'
-                run = int(options.run) == 1
+        print(" ### INFO: Move to data directory ", datadir)
+        if run: os.chdir(datadir)
+        # os.system('ls') #DEBUG
 
-                ch_dir = odir + f'/{ch}'
-                os.system('mkdir -p ' + ch_dir)
+        print(" ### INFO: Create workspace")
+        cmd = f'text2workspace.py {feature}_{grp}_{ch}_os_iso.txt -o {ch_dir}/model.root'
+        if run: os.system(cmd)
 
-                print(" ### INFO: Move to data directory ", datadir)
-                if run: os.chdir(datadir)
-                # os.system('ls') #DEBUG
+        print(" ### INFO: Run Delta Log Likelihood Scan")
+        if "ZZ" in version:
+            r_range = "--rMin 0 --rMax 2"
+        elif "ZbbHtt" in version or "ZttHbb" in version:
+            r_range = "--rMin -20 --rMax 25"
+        else:
+            raise ValueError("COuld not determine ZZ or ZH analysis")
+        cmd = f'combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        if run: os.chdir(ch_dir)
+        if run: os.system(cmd)
 
-                print(" ### INFO: Create workspace")
-                cmd = f'text2workspace.py {feature}_{grp}_{ch}_os_iso.txt -o {ch_dir}/model.root'
-                if run: os.system(cmd)
+        LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
+        f = ROOT.TFile(LS_file)
+        limit = f.Get("limit")
 
-                print(" ### INFO: Run Delta Log Likelihood Scan")
-                cmd = f'combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 --rMin 0 --rMax 2 --preFitValue 1 --expectSignal 1 -t -1'
-                if run: os.chdir(ch_dir)
-                if run: os.system(cmd)
+        to_draw = ROOT.TString("2*deltaNLL:r")
+        n = limit.Draw( to_draw.Data(), "", "l")
 
-                LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
-                f = ROOT.TFile(LS_file)
-                limit = f.Get("limit")
+        x = np.ndarray((n), 'd', limit.GetV2())[1:]
+        y = np.ndarray((n), 'd', limit.GetV1())[1:]
 
-                to_draw = ROOT.TString("2*deltaNLL:r")
-                n = limit.Draw( to_draw.Data(), "", "l")
+        graphScan = ROOT.TGraph(x.size,x,y)
 
-                x = np.ndarray((n), 'd', limit.GetV2())[1:]
-                y = np.ndarray((n), 'd', limit.GetV1())[1:]
+        graphScan.SetTitle("")
+        graphScan.SetLineWidth(3)
+        graphScan.SetLineColor(ROOT.kRed)
+        graphScan.GetYaxis().SetTitle("-2 #Delta LL")
+        graphScan.GetXaxis().SetTitle('#mu')
 
-                graphScan = ROOT.TGraph(x.size,x,y)
+        x_min = graphScan.GetXaxis().GetXmin()
+        x_max = graphScan.GetXaxis().GetXmax()
 
-                graphScan.SetTitle("")
-                graphScan.SetLineWidth(3)
-                graphScan.SetLineColor(ROOT.kRed)
-                graphScan.GetYaxis().SetTitle("-2 #Delta LL")
-                graphScan.GetXaxis().SetTitle('#mu')
+        o_sigma = ROOT.TLine(x_min, 1, x_max, 1)
+        o_sigma.SetLineStyle(7)
+        o_sigma.SetLineWidth(2)
+        o_sigma.SetLineColor(ROOT.kGray+2)
+        t_sigma = ROOT.TLine(x_min, 3.84, x_max, 3.84)
+        t_sigma.SetLineStyle(7)
+        t_sigma.SetLineWidth(2)
+        t_sigma.SetLineColor(ROOT.kGray+2)
 
-                x_min = graphScan.GetXaxis().GetXmin()
-                x_max = graphScan.GetXaxis().GetXmax()
+        c = CanvasCreator([800,800], margins=0.11)
+        c.cd()
+        graphScan.Draw()
 
-                o_sigma = ROOT.TLine(x_min, 1, x_max, 1)
-                o_sigma.SetLineStyle(7)
-                o_sigma.SetLineWidth(2)
-                o_sigma.SetLineColor(ROOT.kGray+2)
-                t_sigma = ROOT.TLine(x_min, 3.84, x_max, 3.84)
-                t_sigma.SetLineStyle(7)
-                t_sigma.SetLineWidth(2)
-                t_sigma.SetLineColor(ROOT.kGray+2)
+        t1 = ROOT.TLatex(0.11, 0.91, "#scale[1.5]{CMS} Private work ("+ch+")")
+        t1.SetTextSize(0.03)
+        t1.SetNDC(True)
+        t1.Draw("SAME")
 
-                c = CanvasCreator([800,800], margins=0.11)
-                c.cd()
-                graphScan.Draw()
+        t2 = ROOT.TLatex(0.6, 0.91, "2018, (13 TeV) 59.7 fb^{-1}")
+        t2.SetTextSize(0.03)
+        t2.SetNDC(True)
+        t2.Draw("SAME")
 
-                t1 = ROOT.TLatex(0.11, 0.91, "#scale[1.5]{CMS} Private work ("+ch+")")
-                t1.SetTextSize(0.03)
-                t1.SetNDC(True)
-                t1.Draw("SAME")
+        o_sigma.Draw("SAME")
+        t_sigma.Draw("SAME")
+        c.Update()
 
-                t2 = ROOT.TLatex(0.6, 0.91, "2018, (13 TeV) 59.7 fb^{-1}")
-                t2.SetTextSize(0.03)
-                t2.SetNDC(True)
-                t2.Draw("SAME")
+        OS = ROOT.TLatex()
+        OS.SetTextFont(42)
+        OS.SetTextSize(0.03)
+        OS.DrawLatex( x[0]*1.1, 1+0.1, '68% C.L.' )
+        TS = ROOT.TLatex()
+        TS.SetTextFont(42)
+        TS.SetTextSize(0.03)
+        TS.DrawLatex( x[0]*1.1, 3.84+0.1, '95% C.L.' )
 
-                o_sigma.Draw("SAME")
-                t_sigma.Draw("SAME")
-                c.Update()
+        c.SaveAs(f"{ch_dir}/DeltaNLL.png")
+        c.SaveAs(f"{ch_dir}/DeltaNLL.pdf")
+        c.Close()
 
-                OS = ROOT.TLatex()
-                OS.SetTextFont(42)
-                OS.SetTextSize(0.03)
-                OS.DrawLatex( x[0]*1.1, 1+0.1, '68% C.L.' )
-                TS = ROOT.TLatex()
-                TS.SetTextFont(42)
-                TS.SetTextSize(0.03)
-                TS.DrawLatex( x[0]*1.1, 3.84+0.1, '95% C.L.' )
+        print(" ### INFO: Run significance extraction")
+        cmd = f'combine -M Significance {feature}_{grp}_{ch}_os_iso.txt -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
+        os.chdir(datadir)
+        if run: os.system(cmd)
+        if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
 
-                c.SaveAs(f"{ch_dir}/DeltaNLL.png")
-                c.SaveAs(f"{ch_dir}/DeltaNLL.pdf")
-                c.Close()
+        LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
+        f = ROOT.TFile(LS_file)
+        limit = f.Get("limit")
+        limit.GetEntry(0)
+        a = limit.limit
 
-                print(" ### INFO: Run significance extraction")
-                cmd = f'combine -M Significance {feature}_{grp}_{ch}_os_iso.txt -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
-                os.chdir(datadir)
-                if run: os.system(cmd)
-                if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
+        cmd = f'combine -M Significance {feature}_{grp}_{ch}_os_iso.txt -t -1 --expectSignal=1 &> {ch_dir}/Significance.log'
+        os.chdir(datadir)
+        if run: os.system(cmd)
+        if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
 
-                LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
-                f = ROOT.TFile(LS_file)
-                limit = f.Get("limit")
-                limit.GetEntry(0)
-                a = limit.limit
+        LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
+        f = ROOT.TFile(LS_file)
+        limit = f.Get("limit")
+        limit.GetEntry(0)
+        b = limit.limit
 
-                cmd = f'combine -M Significance {feature}_{grp}_{ch}_os_iso.txt -t -1 --expectSignal=1 &> {ch_dir}/Significance.log'
-                os.chdir(datadir)
-                if run: os.system(cmd)
-                if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
+        print(" ### INFO: Results for", ch)
+        print(" ### p-value     = ", a)
+        print(" ### significane = ", b)
 
-                LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
-                f = ROOT.TFile(LS_file)
-                limit = f.Get("limit")
-                limit.GetEntry(0)
-                b = limit.limit
+        if run: os.chdir(ch_dir)
 
-                print(" ### INFO: Results for", ch)
-                print(" ### p-value     = ", a)
-                print(" ### significane = ", b)
-
-                if run: os.chdir(ch_dir)
-
-
+    if options.singleThread:
+        for feature in features:
+            for version in versions:
+                for category in categories:
+                    run_limit(feature, version, category)
+    else:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
+            for feature in features:
+                for version in versions:
+                    for category in categories:
+                        exc.submit(run_limit, feature, version, category)
  ### INFO: Results for etau
  ### p-value     =  0.0005750532017919205
  ### significane =  3.2509733438179635

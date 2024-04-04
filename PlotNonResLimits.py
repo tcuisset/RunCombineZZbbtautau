@@ -467,11 +467,11 @@ if __name__ == "__main__" :
         plt.close() 
 
         print(" ### INFO: Produce Full Run 2 impact plots")
-        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1'
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 20 ' +  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
-        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1'
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 20'+  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
-        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json'
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 20'+  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
         cmd = 'plotImpacts.py -i impacts.json -o impacts'
         if run: os.system(cmd)

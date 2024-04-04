@@ -120,8 +120,12 @@ if __name__ == "__main__" :
                 r_range = "--rMin 0 --rMax 2"
                 r_range_setPR = "--setParameterRanges r=0,2"
             elif "ZbbHtt" in version or "ZttHbb" in version:
-                r_range = "--rMin -10 --rMax 15"
-                r_range_setPR = "--setParameterRanges r=-10,15"
+                if "ZHKinFit_mass" in feature:
+                    r_range = "--rMin -50 --rMax 50"
+                    r_range_setPR = "--setParameterRanges r=-50,50"
+                else:
+                    r_range = "--rMin -10 --rMax 15"
+                    r_range_setPR = "--setParameterRanges r=-10,15"
             else:
                 raise ValueError("COuld not determine ZZ or ZH analysis")
         
@@ -258,7 +262,10 @@ if __name__ == "__main__" :
                 plt.xlim(0,2)
                 plt.ylim(-0.05, 1.1*np.max(y_comb))
             elif "ZbbHtt" in version or "ZttHbb" in version:
-                plt.xlim(-10, 15)
+                if "ZHKinFit_mass" in feature:
+                    plt.xlim(-50, 50)
+                else: # DNN
+                    plt.xlim(-10, 15)
                 plt.ylim(-0.05, 6)
             # mplhep.cms.label(data=False, rlabel='2018, (13.6 TeV) 59.7 $fb^{-1}$', fontsize=20)
             mplhep.cms.label(data=False, rlabel='(13 TeV)', fontsize=20)
@@ -360,8 +367,13 @@ if __name__ == "__main__" :
             r_range = "--rMin 0 --rMax 2"
             r_range_setPR = "--setParameterRanges r=0,2"
         elif "ZbbHtt" in version or "ZttHbb" in version:
-            r_range = "--rMin -10 --rMax 15"
-            r_range_setPR = "--setParameterRanges r=-10,15"
+            if "ZHKinFit_mass" in feature:
+                r_range = "--rMin -50 --rMax 50"
+                r_range_setPR = "--setParameterRanges r=-50,50"
+            else: # DNN
+                r_range = "--rMin -10 --rMax 15"
+                r_range_setPR = "--setParameterRanges r=-10,15"
+            
 
         cmd = f'text2workspace.py FullRun2_{feature}_os_iso.txt -o model.root'
         if run: os.system(cmd)
@@ -455,7 +467,10 @@ if __name__ == "__main__" :
             plt.xlim(0,2)
             plt.ylim(-0.05, 1.1*np.max(y_comb))
         elif "ZbbHtt" in version or "ZttHbb" in version:
-            plt.xlim(-10, 15)
+            if "ZHKinFit_mass" in feature:
+                plt.xlim(-50, 50)
+            else: # DNN
+                plt.xlim(-10, 15)
             plt.ylim(-0.05, 6)
         # mplhep.cms.label(data=False, rlabel='2018, (13.6 TeV) 59.7 $fb^{-1}$', fontsize=20)
         mplhep.cms.label(data=False, rlabel='(13 TeV)', fontsize=20)
@@ -467,11 +482,11 @@ if __name__ == "__main__" :
         plt.close() 
 
         print(" ### INFO: Produce Full Run 2 impact plots")
-        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1'
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 20 ' +  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
-        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1'
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 20'+  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
-        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json'
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 20'+  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
         cmd = 'plotImpacts.py -i impacts.json -o impacts'
         if run: os.system(cmd)

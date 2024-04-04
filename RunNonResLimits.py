@@ -91,7 +91,10 @@ if __name__ == "__main__" :
         if "ZZ" in version:
             r_range = "--rMin 0 --rMax 2"
         elif "ZbbHtt" in version or "ZttHbb" in version:
-            r_range = "--rMin -20 --rMax 25"
+            if "ZHKinFit_mass" in feature:
+                r_range = "--rMin -100 --rMax 100"
+            else: # DNN
+                r_range = "--rMin -20 --rMax 25"
         else:
             raise ValueError("COuld not determine ZZ or ZH analysis")
         cmd = f'combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'

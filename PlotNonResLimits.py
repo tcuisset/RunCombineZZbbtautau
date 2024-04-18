@@ -85,7 +85,10 @@ if __name__ == "__main__" :
             print(" ### INFO: Saving combination in ", combdir)
             if run: os.system('mkdir -p ' + combdir)
 
-            cmtdir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
+            if os.environ["USER"] == 'evernazza':
+                cmtdir = '/data_CMS/cms/' + os.environ["USER"][1:] + '/cmt/CreateDatacards/'
+            else:
+                cmtdir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
 
             etau_file = ''; mutau_file = ''; tautau_file = ''
             for category in categories:

@@ -63,7 +63,11 @@ if __name__ == "__main__" :
     prd = options.prd
     grp = options.grp
 
-    basedir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
+    if os.environ["USER"] == 'evernazza':
+        basedir = '/data_CMS/cms/' + os.environ["USER"][1:] + '/cmt/CreateDatacards/'
+    else:
+        basedir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
+
     maindir = os.getcwd() 
 
 

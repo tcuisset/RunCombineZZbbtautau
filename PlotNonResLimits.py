@@ -73,8 +73,13 @@ if __name__ == "__main__" :
         datacard_list = []
         root_list = []
         LS_file_comb_list = []
+        years_list = []
 
-        for version in versions:        
+        for version in versions:
+            if "2016_HIPM" in version:
+                years_list.append("2016_HIPM")
+            else:
+                years_list.append(version[3:7])
 
             combdir = basedir + f'/NonRes/{version}/{prd}/{feature}/Combination'
             print(" ### INFO: Saving combination in ", combdir)
@@ -98,15 +103,15 @@ if __name__ == "__main__" :
             n_comb = 1
             if os.path.exists(etau_file):
                 os.system('cp {} {} {}'.format(etau_file, etau_root, combdir))
-                cmd += f' Name{n_comb}={feature}_{grp}_etau_os_iso.txt'
+                cmd += f' etau={feature}_{grp}_etau_os_iso.txt'
                 n_comb += 1
             if os.path.exists(mutau_file):
                 os.system('cp {} {} {}'.format(mutau_file, mutau_root, combdir))
-                cmd += f' Name{n_comb}={feature}_{grp}_mutau_os_iso.txt'
+                cmd += f' mutau={feature}_{grp}_mutau_os_iso.txt'
                 n_comb += 1
             if os.path.exists(tautau_file):
                 os.system('cp {} {} {}'.format(tautau_file, tautau_root, combdir))
-                cmd += f' Name{n_comb}={feature}_{grp}_tautau_os_iso.txt'
+                cmd += f' tautau={feature}_{grp}_tautau_os_iso.txt'
                 n_comb += 1
             cmd += f' > {version}_{feature}_os_iso.txt'
             print(cmd)
@@ -355,8 +360,8 @@ if __name__ == "__main__" :
             
         cmd = 'combineCards.py'
         n_comb = 1
-        for datacard, root_file in zip(datacard_list, root_list):
-            cmd += f' Year{n_comb}={datacard}'
+        for datacard, root_file, year in zip(datacard_list, root_list, years_list):
+            cmd += f' Year{year}={datacard}'
             n_comb += 1
         cmd += f' > FullRun2_{feature}_os_iso.txt'
         print(cmd)
@@ -482,13 +487,24 @@ if __name__ == "__main__" :
         plt.close() 
 
         print(" ### INFO: Produce Full Run 2 impact plots")
-        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 20 ' +  r" --exclude 'rgx{prop_bin.+}'"
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
         if run: os.system(cmd)
-        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 20'+  r" --exclude 'rgx{prop_bin.+}'"
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
         if run: os.system(cmd)
-        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 20'+  r" --exclude 'rgx{prop_bin.+}'"
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
         if run: os.system(cmd)
         cmd = 'plotImpacts.py -i impacts.json -o impacts'
         if run: os.system(cmd)
         if run: os.system('mkdir -p impacts')
         if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
+
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = 'plotImpacts.py -i impacts_noMCstats.json -o impacts_noMCstats'
+        if run: os.system(cmd)
+        if run: os.system('mkdir -p impacts_noMCstats')
+        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')

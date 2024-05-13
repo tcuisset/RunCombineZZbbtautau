@@ -116,6 +116,8 @@ if __name__ == "__main__" :
                 os.system('cp {} {} {}'.format(tautau_file, tautau_root, combdir))
                 cmd += f' tautau={feature}_{grp}_tautau_os_iso.txt'
                 n_comb += 1
+            if n_comb == 1:
+                raise RuntimeError(f"Did not find any datacard, looked for \n{etau_file}")
             cmd += f' > {version}_{feature}_os_iso.txt'
             print(cmd)
             if run: os.chdir(combdir)

@@ -125,17 +125,21 @@ if __name__ == "__main__" :
     hframe.GetXaxis().SetTitleOffset(1.1)
     if "ZZ" in options.config:
         process_tex = "X#rightarrowZZ#rightarrow bb#tau#tau"
+        hframe.GetXaxis().SetTitle("m_{X} [GeV]")
     elif "ZbbHtt" in options.config:
         process_tex = "Z'#rightarrowZH#rightarrow bb#tau#tau"
+        hframe.GetXaxis().SetTitle("m_{Z'} [GeV]")
     elif "ZttHbb" in options.config:
         process_tex = "Z'#rightarrowZH#rightarrow #tau#tau bb"
+        hframe.GetXaxis().SetTitle("m_{Z'} [GeV]")
     else:
         process_tex = "unknown process"
     hframe.GetYaxis().SetTitle("95% CL on #sigma #times #bf{#it{#Beta}}(" + process_tex + ") [pb]")
-    hframe.GetXaxis().SetTitle("m_{X} [GeV]")
+    
     hframe.SetStats(0)
     ROOT.gPad.SetTicky()
     hframe.Draw()
+    hframe.GetYaxis().SetRangeUser(0.005,5)
 
     ptext1 = ROOT.TPaveText(0.1663218-0.02, 0.886316, 0.3045977-0.02, 0.978947, 'brNDC')
     ptext1.SetBorderSize(0)

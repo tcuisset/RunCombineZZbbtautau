@@ -114,6 +114,7 @@ if __name__ == "__main__" :
     hframe = ROOT.TH1F('hframe', '',
                        100, frame_bounds[0], frame_bounds[1])
     hframe.SetMinimum(0.1)
+    hframe.GetYaxis().SetRangeUser(0.005,5)
 
     hframe.GetYaxis().SetTitleSize(0.047)
     hframe.GetXaxis().SetTitleSize(0.055)

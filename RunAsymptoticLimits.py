@@ -259,8 +259,10 @@ def PlotAsymptoticLimits(base_dir, mass_points, prd, cfg, feat, prefix):
     # Style
     ax.legend()
     ax.set_yscale('log')
+    ax.grid()
 
     fig.savefig(base_dir + f'/{out_folder}/Limits_'+feat+'_'+prd+'_'+cfg+'.png')
+    fig.savefig(base_dir + f'/{out_folder}/Limits_'+feat+'_'+prd+'_'+cfg+'.pdf')
     print(base_dir + f'/{out_folder}/Limits_'+feat+'_'+prd+'_'+cfg+'.png')
 
 

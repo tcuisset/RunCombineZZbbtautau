@@ -43,7 +43,7 @@ if __name__ == "__main__" :
     parser.add_option("--feat",    dest="feat",     default='dnn_ZZbbtt_kl_1')
     parser.add_option("--grp",     dest="grp",      default='datacard_zz')
     parser.add_option("--channels", dest="channels", default="etau,mutau,tautau")
-    parser.add_option("--singleThread", action="store_false", help="Don't run in parallel, disable for debugging")
+    parser.add_option("--singleThread", action="store_true", help="Don't run in parallel, disable for debugging")
     (options, args) = parser.parse_args()
 
     if ',' in options.ver:
@@ -78,7 +78,7 @@ if __name__ == "__main__" :
 
 
     def run_limit(feature, version, category, ch):
-        odir = maindir + f'/NonRes/{version}/{prd}/{feature}'
+        odir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}'
         datadir = basedir + f'/{version}/{category}/{prd}'
         datafile = datadir + f'{feature}_{grp}_{ch}_os_iso.txt'
         run = int(options.run) == 1
@@ -91,7 +91,7 @@ if __name__ == "__main__" :
         # os.system('ls') #DEBUG
 
         print(" ### INFO: Create workspace")
-        cmd = f'text2workspace.py {feature}_{grp}_{ch}_os_iso.txt -o {ch_dir}/model.root'
+        cmd = f'text2workspace.py {feature}_{grp}_{ch}_os_iso.txt -o {ch_dir}/model.root &>{ch_dir}/text2workspace.log'
         if run: os.system(cmd)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
@@ -104,7 +104,7 @@ if __name__ == "__main__" :
                 r_range = "--rMin -20 --rMax 25"
         else:
             raise ValueError("COuld not determine ZZ or ZH analysis")
-        cmd = f'combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        cmd = f'combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit.log'
         if run: os.chdir(ch_dir)
         if run: os.system(cmd)
 

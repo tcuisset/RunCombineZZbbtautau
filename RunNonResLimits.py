@@ -42,6 +42,7 @@ if __name__ == "__main__" :
     parser.add_option("--prd",     dest="prd",      default='')
     parser.add_option("--feat",    dest="feat",     default='dnn_ZZbbtt_kl_1')
     parser.add_option("--grp",     dest="grp",      default='datacard_zz')
+    parser.add_option("--channels", dest="channels", default="etau,mutau,tautau")
     parser.add_option("--singleThread", action="store_false", help="Don't run in parallel, disable for debugging")
     (options, args) = parser.parse_args()
 
@@ -60,6 +61,11 @@ if __name__ == "__main__" :
     else:
         features = [options.feat]
 
+    if ',' in options.channels:
+        channels = options.channels.split(',')
+    else:
+        channels = [options.channels]
+
     prd = options.prd
     grp = options.grp
 
@@ -71,10 +77,7 @@ if __name__ == "__main__" :
     maindir = os.getcwd() 
 
 
-    def run_limit(feature, version, category):
-        if 'etau' in category:      ch = 'etau'
-        if 'mutau' in category:     ch = 'mutau'
-        if 'tautau' in category:    ch = 'tautau'
+    def run_limit(feature, version, category, ch):
         odir = maindir + f'/NonRes/{version}/{prd}/{feature}'
         datadir = basedir + f'/{version}/{category}/{prd}'
         datafile = datadir + f'{feature}_{grp}_{ch}_os_iso.txt'
@@ -199,13 +202,19 @@ if __name__ == "__main__" :
         for feature in features:
             for version in versions:
                 for category in categories:
-                    run_limit(feature, version, category)
+                    for channel in channels:
+                        run_limit(feature, version, category, channel)
     else:
         with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
+            futures = []
             for feature in features:
                 for version in versions:
                     for category in categories:
-                        exc.submit(run_limit, feature, version, category)
+                        for channel in channels:
+                            futures.append(exc.submit(run_limit, feature, version, category, channel))
+            for res in concurrent.futures.as_completed(futures):
+                res.result()
+            
  ### INFO: Results for etau
  ### p-value     =  0.0005750532017919205
  ### significane =  3.2509733438179635

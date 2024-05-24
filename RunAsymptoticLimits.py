@@ -215,7 +215,7 @@ def PlotAsymptoticLimits(base_dir, mass_points, prd, cfg, feat, prefix):
     elif '2017' in cfg:        text_year = r'2017 - 41.5 fb$^{-1}$ (13 TeV)'
     elif '2016' in cfg:        text_year = r'2016 PostVFP - 16.8 fb$^{-1}$ (13 TeV)'
     elif '2016_HIPM' in cfg:   text_year = r'2016 PreVFP - 19.5 fb$^{-1}$ (13 TeV)'
-    elif 'FullRun2' in cfg: text_year = r'Full Run 2 - 137.1 fb$^{-1}$ (13 TeV)'
+    elif 'FullRun2' in cfg: text_year = r'137.1 fb$^{-1}$ (13 TeV)'
     
     for mass_value in mass_points:
         limit_file = base_dir + f'/{folder_name}/{feat}_{mass_value}/limits.json'

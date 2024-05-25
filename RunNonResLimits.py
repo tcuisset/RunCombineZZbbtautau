@@ -14,9 +14,9 @@ logging.getLogger('matplotlib').setLevel(logging.ERROR)
 # IF YOU ONLY NEED TO CHANGE THE PLOTTING STYLE, RUN WITH THE OPTION: --plot_only
 
 '''
-python3 RunNonResLimits.py --ver ul_2018_ZZ_v12 \
+python3 RunNonResLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
     --cat cat_ZZ_elliptical_cut_90_resolved_1b,cat_ZZ_elliptical_cut_90_resolved_2b,cat_ZZ_elliptical_cut_90_boosted_noPNet \
-    --feat dnn_ZZbbtt_kl_1 --prd prod_240523 --grp datacard_zz
+    --feat dnn_ZZbbtt_kl_1 --prd prod_240523 --grp datacard_zz --move_eos --user_eos evernazz
 '''
 
 #######################################################################
@@ -41,6 +41,7 @@ if __name__ == "__main__" :
     parser.add_option("--run_year",     dest="run_year",     default=True,             help='Combine years or not')
     parser.add_option("--plot_only",    dest="plot_only",    default=False,            action='store_true')
     parser.add_option("--move_eos",     dest="move_eos",     default=False,            action='store_true')
+    parser.add_option("--user_eos",     dest="user_eos",     default='evernazz',       help='User Name for lxplus account')
     (options, args) = parser.parse_args()
 
     if ',' in options.ver:
@@ -79,14 +80,14 @@ if __name__ == "__main__" :
     maindir = os.getcwd() 
 
     if "ZZ" in options.ver:
-        o_name = 'ZZ'
+        o_name = 'ZZbbtt'; fancy_name = '$ZZ_{bb\tau\tau}$'
         r_range_single = r_range_single_KinFit = r_range_comb = r_range_comb_KinFit = "--rMin 0 --rMax 2"
         r_range_setPR_comb = r_range_setPR_KinFit = "--setParameterRanges r=0,2"
     else: 
         if "ZbbHtt" in options.ver:
-            o_name = 'ZbbHtt'
+            o_name = 'ZbbHtt'; fancy_name = '$Z_{bb}H_{\tau\tau}$'
         elif "ZttHbb" in options.ver:
-            o_name = 'ZttHbb'
+            o_name = 'ZttHbb'; fancy_name = '$Z_{\tau\tau}H_{bb}$'
         r_range_single = "--rMin -20 --rMax 25"
         r_range_comb = "--rMin -10 --rMax 15"
         r_range_setPR_comb = "--setParameterRanges r=-10,15"
@@ -101,15 +102,42 @@ if __name__ == "__main__" :
         plt.axhline(y=3.84, color='gray', linestyle='--', linewidth=2)
         plt.text(x[0] + 0.05, 1 + 0.1, '68% C.L.', fontsize=18)
         plt.text(x[0] + 0.05, 3.84 + 0.1, '95% C.L.', fontsize=18)
-        plt.text(0.97, 0.97, line1, ha="right", va="top", transform=plt.gca().transAxes, color="black")
-        plt.text(0.97, 0.92, line2, ha="right", va="top", transform=plt.gca().transAxes, color="black")
+        plt.text(0.03, 0.97, line1, ha="left", va="top", transform=plt.gca().transAxes, color="black", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+        plt.text(0.03, 0.92, line2, ha="left", va="top", transform=plt.gca().transAxes, color="black", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
         mplhep.cms.label(data=False)
         plt.xlabel('$\\mu$')
         plt.ylabel('-2 $\\Delta LL$')
         plt.title("")
         plt.xlim(x[0], x[-1])
         plt.ylim(0,max)
+        plt.grid()
 
+    def WriteResults (fig, x, y, x_stat, y_stat, sig_file, sig=True, round = 2):
+
+        central = x[np.argmin(y)]
+        interval_1sigma = x[np.where(y < 1)]
+        min_1sigma = np.abs(min(interval_1sigma)-central)
+        max_1sigma = np.abs(max(interval_1sigma)-central)
+        interval_1sigma_stat = x_stat[np.where(y_stat < 1)]
+        min_1sigma_stat = np.abs(min(interval_1sigma_stat)-central)
+        max_1sigma_stat = np.abs(max(interval_1sigma_stat)-central)
+        r = central
+        up = max_1sigma
+        down = min_1sigma
+        up_stat = max_1sigma_stat
+        down_stat = min_1sigma_stat
+        up_syst = np.sqrt(max_1sigma**2 - max_1sigma_stat**2)
+        down_syst = np.sqrt(min_1sigma**2 - min_1sigma_stat**2)
+        sig = GetLimit(sig_file)
+
+        text = fr"$\mu = 1.00^{{+{up_syst:.{round}f}}}_{{-{down_syst:.{round}f}}}(syst)^{{+{up_stat:.{round}f}}}_{{-{down_stat:.{round}f}}}(stat)$"
+        if sig: text += f"\nSignificance = {sig:.{round}f}$\sigma$"
+        plt.text(0.03, 0.91, text, ha='left', va='top', transform=plt.gca().transAxes, fontsize='small',
+            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+        sig = GetLimit(sig_file)
+        # plt.text(0.03, 0.85, f"Significance = {sig:.{round}f}$\sigma$", ha='left', va='top', transform=plt.gca().transAxes, fontsize='small',
+        #     bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+    
     def GetDeltaLL(LS_file):
         file = uproot.open(LS_file)
         limit = file["limit"]
@@ -142,13 +170,13 @@ if __name__ == "__main__" :
 
         odir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}'
         datadir = cmtdir + f'/{version}/{category}/{prd}'
-        datafile = datadir + f'{feature}_{grp}_{ch}_os_iso.txt'
+        datafile = datadir + f'/{feature}_{grp}_{ch}_os_iso.txt'
 
         ch_dir = odir + f'/{ch}'
         os.system('mkdir -p ' + ch_dir)
 
         print(" ### INFO: Create workspace")
-        cmd = f'cd {datadir} && text2workspace.py {feature}_{grp}_{ch}_os_iso.txt -o {ch_dir}/model.root &>{ch_dir}/text2workspace.log'
+        cmd = f'cd {datadir} && text2workspace.py {datafile} -o {ch_dir}/model.root &>{ch_dir}/text2workspace.log'
         if run: os.system(cmd)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
@@ -161,7 +189,7 @@ if __name__ == "__main__" :
         fig = plt.figure(figsize=(10, 10))
         plt.plot(x, y, label='Data', color='red', linewidth=3)
         SetStyle(fig, x, cat_name, dict_ch_name[ch])
-        ver_short = version.split("_")[-2] ; cat_short = category.split("_cut_90_")[1]
+        ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
         plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.png")
         plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.pdf")
 
@@ -169,21 +197,21 @@ if __name__ == "__main__" :
 
             # Creates problems when parallelizing, but it's only to print out the significance so we can drop it
             print(" ### INFO: Run significance extraction")
-            cmd = f'cd {datadir} && combine -M Significance {feature}_{grp}_{ch}_os_iso.txt -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
+            cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
             if run: os.system(cmd)
             if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
             a = GetLimit(LS_file)
 
-            cmd = f'cd {datadir} && combine -M Significance {feature}_{grp}_{ch}_os_iso.txt -t -1 --expectSignal=1 &> {ch_dir}/Significance.log'
+            cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
             if run: os.system(cmd)
             if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
             b = GetLimit(LS_file)
 
-            print(" ### INFO: Results for", ch)
+            print(" ### INFO: Results for", feature, version, category, ch)
             print(" ### p-value     = ", a)
-            print(" ### significane = ", b, "/n")
+            print(" ### significane = ", b, "\n")
 
         if run: os.chdir(ch_dir)
 
@@ -214,11 +242,6 @@ if __name__ == "__main__" :
 
     def run_comb_channels(feature, version, category):
 
-        if "boosted" in category:        cat_name = r"Boosted"
-        elif "resolved_1b" in category:  cat_name = r"Res 1b"
-        elif "resolved_2b" in category:  cat_name = r"Res 2b"
-        else:                            cat_name = "category"
-
         combdir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch'
         print(" ### INFO: Saving combination in ", combdir)
         if run: os.system('mkdir -p ' + combdir)
@@ -227,9 +250,10 @@ if __name__ == "__main__" :
         for ch in channels:
             ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{ch}_os_iso.txt'
             ch_root = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{ch}_os_iso.root'
-            os.system('cp {} {} {}'.format(ch_file, ch_root, combdir))
+            os.system(f'cp {ch_file} {combdir}/{version}_{category}_{feature}_{grp}_{ch}_os_iso.txt')
+            os.system(f'cp {ch_root} {combdir}')
             if os.path.exists(ch_file):
-                cmd += f' {ch}={feature}_{grp}_{ch}_os_iso.txt'
+                cmd += f' {ch}={version}_{category}_{feature}_{grp}_{ch}_os_iso.txt'
         cmd += f' > {version}_{feature}_{category}_os_iso.txt'
         if run: os.chdir(combdir)
         if run: os.system(cmd)
@@ -243,7 +267,7 @@ if __name__ == "__main__" :
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
-        cmd = f'combine -M Significance {version}_{feature}_{category}_os_iso.txt -t -1 --expectSignal=1 &> Significance.log'
+        cmd = f'combine -M Significance {version}_{feature}_{category}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}_{category}.log'
         if run: os.system(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
@@ -300,11 +324,12 @@ if __name__ == "__main__" :
                     x, y = GetDeltaLL(LS_file)
                     plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
                     LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-                    x, y = GetDeltaLL(LS_file)
-                    plt.plot(x, y, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-                    plt.legend(loc='upper left', fontsize=18, frameon=True)
+                    x_stat, y_stat = GetDeltaLL(LS_file)
+                    plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                    plt.legend(loc='upper right', fontsize=18, frameon=True)
                     SetStyle(fig, x, cat_name, "", 8)
-                    ver_short = version.split("_")[-2] ; cat_short = category.split("_cut_90_")[1]
+                    WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.Significance.mH120.root')
+                    ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
                     plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.png')
                     plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.pdf')
 
@@ -321,7 +346,8 @@ if __name__ == "__main__" :
         cmd = f'combineCards.py'
         for category in categories:
             cat_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/{version}_{feature}_{category}_os_iso.txt'
-            cmd += f' {category}={cat_file}'
+            cat_short = category.split("_cut_90_")[1]
+            cmd += f' {cat_short}={cat_file}'
         cmd += f' > {version}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
         if run: os.system(cmd)
@@ -335,7 +361,7 @@ if __name__ == "__main__" :
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
-        cmd = f'combine -M Significance {version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance.log'
+        cmd = f'combine -M Significance {version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}.log'
         if run: os.system(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
@@ -387,11 +413,12 @@ if __name__ == "__main__" :
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
                 LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-                x, y = GetDeltaLL(LS_file)
-                plt.plot(x, y, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-                plt.legend(loc='upper left', fontsize=18, frameon=True)
+                x_stat, y_stat = GetDeltaLL(LS_file)
+                plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                plt.legend(loc='upper right', fontsize=18, frameon=True)
                 SetStyle(fig, x, cat_name, "", 8)
-                ver_short = version.split("_")[-2]
+                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.Significance.mH120.root')
+                ver_short = version.split("ul_")[1].split("_Z")[0]
                 plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')
                 plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.pdf')
 
@@ -407,33 +434,64 @@ if __name__ == "__main__" :
 
         cmd = f'combineCards.py'
         for version in versions:
-            year = version.split("_")[-2]
+            year = version.split("ul_")[1].split("_Z")[0]
             ver_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
-                cmd += f' {year}={ver_file}'
+                cmd += f' Y{year}={ver_file}'
         cmd += f' > FullRun2_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
+        print(cmd)
         if run: os.system(cmd)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
         cmd = f'text2workspace.py FullRun2_{feature}_os_iso.txt -o model.root'
+        print(cmd)
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        print(cmd)
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        print(cmd)
         if run: os.system(cmd)
-        cmd = f'combine -M Significance FullRun2_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance.log'
+        cmd = f'combine -M Significance FullRun2_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
+        print(cmd)
         if run: os.system(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
+        print(cmd)
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
+        print(cmd)
         if run: os.system(cmd)
+
+        print(" ### INFO: Produce Full Run 2 Impact Plots")
+
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
+        if run: os.system(cmd)
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
+        if run: os.system(cmd)
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
+        if run: os.system(cmd)
+        cmd = f'plotImpacts.py -i impacts.json -o Impacts_{feature}'
+        if run: os.system(cmd)
+        if run: os.system('mkdir -p impacts')
+        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
+
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{feature}_NoMCstats'
+        if run: os.system(cmd)
+        if run: os.system('mkdir -p impacts_noMCstats')
+        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
 
     if run_year:
 
@@ -464,15 +522,16 @@ if __name__ == "__main__" :
             for i, version in enumerate(versions):
                 LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
-                plt.plot(x, y, label=version.split("_")[-2], linewidth=3, color=cmap(i))
+                plt.plot(x, y, label=version.split("ul_")[1].split("_Z")[0], linewidth=3, color=cmap(i))
             LS_file = maindir + f'/NonRes/FullRun2/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
             x, y = GetDeltaLL(LS_file)
             plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
             LS_file = maindir + f'/NonRes/FullRun2/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-            x, y = GetDeltaLL(LS_file)
-            plt.plot(x, y, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-            plt.legend(loc='upper left', fontsize=18, frameon=True)
-            SetStyle(fig, x, o_name, "", 8)
+            x_stat, y_stat = GetDeltaLL(LS_file)
+            plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+            plt.legend(loc='upper right', fontsize=18, frameon=True)
+            SetStyle(fig, x, fancy_name, "", 8)
+            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/FullRun2/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
             plt.savefig(maindir + f'/NonRes/FullRun2/{prd}/{feature}/DeltaNLL_FullRun2.png')
             plt.savefig(maindir + f'/NonRes/FullRun2/{prd}/{feature}/DeltaNLL_FullRun2.pdf')
 
@@ -481,6 +540,23 @@ if __name__ == "__main__" :
     ################################################################################################################################
 
     if options.move_eos:
-        print('ok')
 
+        eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/{o_name}/{prd}'
+        os.system(f'mkdir -p {eos_dir}')
+        user = options.user_eos
+        print(f" ### INFO: Copy results to {user}@lxplus.cern.ch")
+        print(f"           Inside directory {eos_dir}\n")
+
+        cmd = f"rsync -rltv "
+        copy_list = []
+        for feature in features:
+            for version in versions:
+                for category in categories:
+                    cmd += maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* '
+                cmd += maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* '
+            cmd += maindir + f'/NonRes/FullRun2/{prd}/{feature}/DeltaNLL*.p* '
+            cmd += maindir + f'/NonRes/FullRun2/{prd}/{feature}/*_os_iso.txt '
+            cmd += maindir + f'/NonRes/FullRun2/{prd}/{feature}/Impacts* '
+        cmd += f"{user}@lxplus.cern.ch:{eos_dir}"
+        os.system(cmd)
 

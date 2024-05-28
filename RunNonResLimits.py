@@ -17,6 +17,16 @@ logging.getLogger('matplotlib').setLevel(logging.ERROR)
 python3 RunNonResLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
     --cat cat_ZZ_elliptical_cut_90_resolved_1b,cat_ZZ_elliptical_cut_90_resolved_2b,cat_ZZ_elliptical_cut_90_boosted_noPNet \
     --feat dnn_ZZbbtt_kl_1 --prd prod_240523 --grp datacard_zz --move_eos --user_eos evernazz
+
+python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZbbHtt_v12,ul_2016_ZbbHtt_v12,ul_2017_ZbbHtt_v12,ul_2018_ZbbHtt_v12 \
+    --cat cat_ZbbHtt_elliptical_cut_90_resolved_1b,cat_ZbbHtt_elliptical_cut_90_resolved_2b,cat_ZbbHtt_elliptical_cut_90_boosted_noPNet \
+    --feat dnn_ZbbHtt_kl_1 --featureDependsOnMass --prd prod_... --grp datacard_zbbhtt \
+    --move_eos --user_eos cuisset
+
+python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,ul_2017_ZttHbb_v12,ul_2018_ZttHbb_v12 \
+    --cat cat_ZttHbb_elliptical_cut_90_resolved_1b,cat_ZttHbb_elliptical_cut_90_resolved_2b,cat_ZttHbb_elliptical_cut_90_boosted_noPNet \
+    --feat dnn_ZttHbb_kl_1 --featureDependsOnMass --prd prod_... --grp datacard_ztthbb \
+    --move_eos --user_eos cuisset
 '''
 
 #######################################################################
@@ -113,7 +123,6 @@ if __name__ == "__main__" :
         plt.grid()
 
     def WriteResults (fig, x, y, x_stat, y_stat, sig_file, sig=True, round = 2):
-
         central = x[np.argmin(y)]
         interval_1sigma = x[np.where(y < 1)]
         min_1sigma = np.abs(min(interval_1sigma)-central)
@@ -428,7 +437,7 @@ if __name__ == "__main__" :
 
     def run_comb_years(feature):
 
-        combdir = maindir + f'/NonRes/FullRun2/{prd}/{feature}'
+        combdir = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}'
         print(" ### INFO: Saving combination in ", combdir)
         if run: os.system('mkdir -p ' + combdir)
 
@@ -438,7 +447,7 @@ if __name__ == "__main__" :
             ver_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
                 cmd += f' Y{year}={ver_file}'
-        cmd += f' > FullRun2_{feature}_os_iso.txt'
+        cmd += f' > FullRun2_{o_name}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
         print(cmd)
         if run: os.system(cmd)
@@ -446,7 +455,7 @@ if __name__ == "__main__" :
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py FullRun2_{feature}_os_iso.txt -o model.root'
+        cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root'
         print(cmd)
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
@@ -455,7 +464,7 @@ if __name__ == "__main__" :
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         print(cmd)
         if run: os.system(cmd)
-        cmd = f'combine -M Significance FullRun2_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
+        cmd = f'combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
         print(cmd)
         if run: os.system(cmd)
 
@@ -477,7 +486,7 @@ if __name__ == "__main__" :
         if run: os.system(cmd)
         cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
         if run: os.system(cmd)
-        cmd = f'plotImpacts.py -i impacts.json -o Impacts_{feature}'
+        cmd = f'plotImpacts.py -i impacts.json -o Impacts_{o_name}_{feature}'
         if run: os.system(cmd)
         if run: os.system('mkdir -p impacts')
         if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
@@ -488,7 +497,7 @@ if __name__ == "__main__" :
         if run: os.system(cmd)
         cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
         if run: os.system(cmd)
-        cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{feature}_NoMCstats'
+        cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{o_name}_{feature}_NoMCstats'
         if run: os.system(cmd)
         if run: os.system('mkdir -p impacts_noMCstats')
         if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
@@ -523,17 +532,17 @@ if __name__ == "__main__" :
                 LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label=version.split("ul_")[1].split("_Z")[0], linewidth=3, color=cmap(i))
-            LS_file = maindir + f'/NonRes/FullRun2/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
             x, y = GetDeltaLL(LS_file)
             plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-            LS_file = maindir + f'/NonRes/FullRun2/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
             x_stat, y_stat = GetDeltaLL(LS_file)
             plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
             plt.legend(loc='upper right', fontsize=18, frameon=True)
             SetStyle(fig, x, fancy_name, "", 8)
-            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/FullRun2/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
-            plt.savefig(maindir + f'/NonRes/FullRun2/{prd}/{feature}/DeltaNLL_FullRun2.png')
-            plt.savefig(maindir + f'/NonRes/FullRun2/{prd}/{feature}/DeltaNLL_FullRun2.pdf')
+            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+            plt.savefig(maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.png')
+            plt.savefig(maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.pdf')
 
     ################################################################################################################################
     ################################################################################################################################
@@ -541,22 +550,23 @@ if __name__ == "__main__" :
 
     if options.move_eos:
 
-        eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/{o_name}/{prd}'
-        os.system(f'mkdir -p {eos_dir}')
+        eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/{o_name}/Limits/NonRes'
         user = options.user_eos
         print(f" ### INFO: Copy results to {user}@lxplus.cern.ch")
         print(f"           Inside directory {eos_dir}\n")
 
-        cmd = f"rsync -rltv "
-        copy_list = []
+        # [FIXME] Work-around for mkdir on eos
+        os.system(f'mkdir -p TMP_RESULTS_NONRES && cp index.php TMP_RESULTS_NONRES')
         for feature in features:
+            os.system(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
+            os.system(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
+            os.system(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
             for version in versions:
+                ver_short = version.split("ul_")[1].split("_Z")[0]
+                os.system(f'mkdir -p TMP_RESULTS_NONRES/{ver_short} && cp index.php TMP_RESULTS_NONRES/{ver_short}')
+                os.system(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
                 for category in categories:
-                    cmd += maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* '
-                cmd += maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* '
-            cmd += maindir + f'/NonRes/FullRun2/{prd}/{feature}/DeltaNLL*.p* '
-            cmd += maindir + f'/NonRes/FullRun2/{prd}/{feature}/*_os_iso.txt '
-            cmd += maindir + f'/NonRes/FullRun2/{prd}/{feature}/Impacts* '
-        cmd += f"{user}@lxplus.cern.ch:{eos_dir}"
-        os.system(cmd)
+                    os.system(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+        os.system(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
+        os.system(f'rm -r TMP_RESULTS_NONRES')
 

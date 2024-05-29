@@ -191,7 +191,7 @@ if __name__ == "__main__" :
         if run: os.system(cmd)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
-        cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit.log'
+        cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}multiDimFit.log'
         if run: os.system(cmd)
 
         LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
@@ -272,7 +272,7 @@ if __name__ == "__main__" :
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py {version}_{feature}_{category}_os_iso.txt -o model.root'
+        cmd = f'text2workspace.py {version}_{feature}_{category}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
@@ -366,7 +366,7 @@ if __name__ == "__main__" :
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py {version}_{feature}_os_iso.txt -o model.root'
+        cmd = f'text2workspace.py {version}_{feature}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
         if run: os.system(cmd)
@@ -458,7 +458,7 @@ if __name__ == "__main__" :
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root'
+        cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
         print(cmd)
         if run: os.system(cmd)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'

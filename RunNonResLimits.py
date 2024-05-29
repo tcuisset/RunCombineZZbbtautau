@@ -92,14 +92,14 @@ if __name__ == "__main__" :
     maindir = os.getcwd() 
 
     if "ZZ" in options.ver:
-        o_name = 'ZZbbtt'; fancy_name = '$ZZ_{bb\tau\tau}$'
+        o_name = 'ZZbbtt'; fancy_name = '$ZZ_{bb\\tau\\tau}$'
         r_range_single = r_range_single_KinFit = r_range_comb = r_range_comb_KinFit = "--rMin 0 --rMax 2"
         r_range_setPR_comb = r_range_setPR_KinFit = "--setParameterRanges r=0,2"
     else: 
         if "ZbbHtt" in options.ver:
-            o_name = 'ZbbHtt'; fancy_name = '$Z_{bb}H_{\tau\tau}$'
+            o_name = 'ZbbHtt'; fancy_name = '$Z_{bb}H_{\\tau\\tau}$'
         elif "ZttHbb" in options.ver:
-            o_name = 'ZttHbb'; fancy_name = '$Z_{\tau\tau}H_{bb}$'
+            o_name = 'ZttHbb'; fancy_name = '$Z_{\\tau\\tau}H_{bb}$'
         r_range_single = "--rMin -20 --rMax 25"
         r_range_comb = "--rMin -10 --rMax 15"
         r_range_setPR_comb = "--setParameterRanges r=-10,15"
@@ -191,7 +191,7 @@ if __name__ == "__main__" :
         if run: os.system(cmd)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
-        cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}multiDimFit.log'
+        cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}/multiDimFit.log'
         if run: os.system(cmd)
 
         LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'

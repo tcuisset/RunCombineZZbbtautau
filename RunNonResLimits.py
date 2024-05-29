@@ -14,6 +14,8 @@ logging.getLogger('matplotlib').setLevel(logging.ERROR)
 # IF YOU ONLY NEED TO CHANGE THE PLOTTING STYLE, RUN WITH THE OPTION: --plot_only
 
 '''
+ulimit -s unlimited
+
 python3 RunNonResLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
     --cat cat_ZZ_elliptical_cut_90_resolved_1b,cat_ZZ_elliptical_cut_90_resolved_2b,cat_ZZ_elliptical_cut_90_boosted_noPNet \
     --feat dnn_ZZbbtt_kl_1 --prd prod_240523 --grp datacard_zz --move_eos --user_eos evernazz
@@ -425,7 +427,8 @@ if __name__ == "__main__" :
                 x_stat, y_stat = GetDeltaLL(LS_file)
                 plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
                 plt.legend(loc='upper right', fontsize=18, frameon=True)
-                SetStyle(fig, x, cat_name, "", 8)
+                year = version.split("ul_")[1].split("_Z")[0]
+                SetStyle(fig, x, year, "", 8)
                 WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.Significance.mH120.root')
                 ver_short = version.split("ul_")[1].split("_Z")[0]
                 plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')

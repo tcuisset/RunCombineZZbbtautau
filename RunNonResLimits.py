@@ -1,6 +1,7 @@
 import os,sys
 import numpy as np
 import concurrent.futures
+import subprocess
 
 import uproot
 import matplotlib.pyplot as plt
@@ -14,6 +15,8 @@ logging.getLogger('matplotlib').setLevel(logging.ERROR)
 # IF YOU ONLY NEED TO CHANGE THE PLOTTING STYLE, RUN WITH THE OPTION: --plot_only
 
 '''
+# Use --run_ch or --no-run_ch for example
+
 ulimit -s unlimited
 
 python3 RunNonResLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
@@ -31,31 +34,40 @@ python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,
     --move_eos --user_eos cuisset
 '''
 
+def run_cmd(cmd, run=True):
+    if run:
+        subprocess.run(cmd, shell=True, check=True)
+
 #######################################################################
 ######################### SCRIPT BODY #################################
 #######################################################################
 
 if __name__ == "__main__" :
 
-    from optparse import OptionParser
-    parser = OptionParser()
-    parser.add_option("--run",          dest="run",          default=True)
-    parser.add_option("--ver",          dest="ver",          default='')
-    parser.add_option("--cat",          dest="cat",          default='')
-    parser.add_option("--prd",          dest="prd",          default='')
-    parser.add_option("--feat",         dest="feat",         default='dnn_ZZbbtt_kl_1')
-    parser.add_option("--grp",          dest="grp",          default='datacard_zz')
-    parser.add_option("--channels",     dest="channels",     default="etau,mutau,tautau")
-    parser.add_option("--singleThread", action="store_true", help="Don't run in parallel, disable for debugging")
-    parser.add_option("--run_one",      dest="run_one",      default=True,             help='Run each channel or not')
-    parser.add_option("--run_ch",       dest="run_ch",       default=True,             help='Combine channels or not')
-    parser.add_option("--run_cat",      dest="run_cat",      default=True,             help='Combine categories or not')
-    parser.add_option("--run_zh_comb",  dest="run_zh_comb",  default=False,            help='Run ZbbHtt & ZttHbb combination')
-    parser.add_option("--run_year",     dest="run_year",     default=True,             help='Combine years or not')
-    parser.add_option("--plot_only",    dest="plot_only",    default=False,            action='store_true')
-    parser.add_option("--move_eos",     dest="move_eos",     default=False,            action='store_true')
-    parser.add_option("--user_eos",     dest="user_eos",     default='evernazz',       help='User Name for lxplus account')
-    (options, args) = parser.parse_args()
+    import argparse
+    parser = argparse.ArgumentParser("RunNonResLimits")
+    parser.add_argument("--run",          dest="run",          default=True)
+    parser.add_argument("--ver",          dest="ver",          default='')
+    parser.add_argument("--cat",          dest="cat",          default='')
+    parser.add_argument("--prd",          dest="prd",          default='')
+    parser.add_argument("--feat",         dest="feat",         default='dnn_ZZbbtt_kl_1')
+    parser.add_argument("--grp",          dest="grp",          default='datacard_zz')
+    parser.add_argument("--channels",     dest="channels",     default="etau,mutau,tautau")
+    def makeFlag(arg_name, **kwargs):
+        if arg_name.startswith("--"):
+            arg_name = arg_name[2:]
+        parser.add_argument(f"--{arg_name}", action='store_true', **kwargs)
+        parser.add_argument(f"--no_{arg_name}", action='store_false', **kwargs)
+    makeFlag("--singleThread", default=False, help="Don't run in parallel, disable for debugging")
+    makeFlag("--run_one",      dest="run_one",      default=True,             help='Run each channel or not')
+    makeFlag("--run_ch",       dest="run_ch",       default=True,             help='Combine channels or not')
+    makeFlag("--run_cat",      dest="run_cat",      default=True,             help='Combine categories or not')
+    makeFlag("--run_zh_comb",  dest="run_zh_comb",  default=False,            help='Run ZbbHtt & ZttHbb combination')
+    makeFlag("--run_year",     dest="run_year",     default=True,             help='Combine years or not')
+    makeFlag("--plot_only",    dest="plot_only",    default=False)
+    makeFlag("--move_eos",     dest="move_eos",     default=False)
+    parser.add_argument("--user_eos",     dest="user_eos",     default='evernazz',       help='User Name for lxplus account')
+    options = parser.parse_args()
 
     if ',' in options.ver:
         versions = options.ver.split(',')
@@ -186,15 +198,15 @@ if __name__ == "__main__" :
         datafile = datadir + f'/{feature}_{grp}_{ch}_os_iso.txt'
 
         ch_dir = odir + f'/{ch}'
-        os.system('mkdir -p ' + ch_dir)
+        run_cmd('mkdir -p ' + ch_dir)
 
         print(" ### INFO: Create workspace")
         cmd = f'cd {datadir} && text2workspace.py {datafile} -o {ch_dir}/model.root &>{ch_dir}/text2workspace.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
         cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}/multiDimFit.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
         x, y = GetDeltaLL(LS_file)
@@ -211,14 +223,14 @@ if __name__ == "__main__" :
             # Creates problems when parallelizing, but it's only to print out the significance so we can drop it
             print(" ### INFO: Run significance extraction")
             cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
-            if run: os.system(cmd)
-            if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
+            if run: run_cmd(cmd)
+            if run: run_cmd(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
             a = GetLimit(LS_file)
 
             cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
-            if run: os.system(cmd)
-            if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
+            if run: run_cmd(cmd)
+            if run: run_cmd(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
             b = GetLimit(LS_file)
 
@@ -257,39 +269,39 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch'
         print(" ### INFO: Saving combination in ", combdir)
-        if run: os.system('mkdir -p ' + combdir)
+        if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for ch in channels:
             ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{ch}_os_iso.txt'
             ch_root = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{ch}_os_iso.root'
-            os.system(f'cp {ch_file} {combdir}/{version}_{category}_{feature}_{grp}_{ch}_os_iso.txt')
-            os.system(f'cp {ch_root} {combdir}')
+            run_cmd(f'cp {ch_file} {combdir}/{version}_{category}_{feature}_{grp}_{ch}_os_iso.txt')
+            run_cmd(f'cp {ch_root} {combdir}')
             if os.path.exists(ch_file):
                 cmd += f' {ch}={version}_{category}_{feature}_{grp}_{ch}_os_iso.txt'
         cmd += f' > {version}_{feature}_{category}_os_iso.txt'
         if run: os.chdir(combdir)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
         cmd = f'text2workspace.py {version}_{feature}_{category}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        if run: run_cmd(cmd)
         cmd = f'combine -M Significance {version}_{feature}_{category}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}_{category}.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
     if run_ch:
 
@@ -354,7 +366,7 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat'
         print(" ### INFO: Saving combination in ", combdir)
-        if run: os.system('mkdir -p ' + combdir)
+        if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for category in categories:
@@ -363,27 +375,27 @@ if __name__ == "__main__" :
             cmd += f' {cat_short}={cat_file}'
         cmd += f' > {version}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py {version}_{feature}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
-        if run: os.system(cmd)
+        cmd = f'text2workspace.py {version}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        if run: run_cmd(cmd)
         cmd = f'combine -M Significance {version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
     if run_cat:
 
@@ -445,7 +457,7 @@ if __name__ == "__main__" :
         version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
         combdir = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/'
         print(" ### INFO: Saving ZH combination in ", combdir)
-        if run: os.system('mkdir -p ' + combdir)
+        if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for version, short_name in [(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]:
@@ -453,27 +465,27 @@ if __name__ == "__main__" :
             cmd += f' {short_name}={cat_file}'
         cmd += f' > {version_comb}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py {version_comb}_{feature}_os_iso.txt -o model.root'
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
-        if run: os.system(cmd)
+        cmd = f'text2workspace.py {version_comb}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        if run: run_cmd(cmd)
         cmd = f'combine -M Significance {version_comb}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version_comb}_{feature}.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
     if run_zh_comb:
         versions_ZbbHtt = []
@@ -540,7 +552,7 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}'
         print(" ### INFO: Saving combination in ", combdir)
-        if run: os.system('mkdir -p ' + combdir)
+        if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for version in versions:
@@ -551,57 +563,57 @@ if __name__ == "__main__" :
         cmd += f' > FullRun2_{o_name}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
         print(cmd)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
+        cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
         print(cmd)
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
         print(cmd)
-        if run: os.system(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        if run: run_cmd(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
         print(cmd)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
         print(cmd)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
         print(cmd)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
         print(cmd)
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
 
         print(" ### INFO: Produce Full Run 2 Impact Plots")
 
         cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'plotImpacts.py -i impacts.json -o Impacts_{o_name}_{feature}'
-        if run: os.system(cmd)
-        if run: os.system('mkdir -p impacts')
-        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
+        if run: run_cmd(cmd)
+        if run: run_cmd('mkdir -p impacts')
+        if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
 
         cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
-        if run: os.system(cmd)
+        if run: run_cmd(cmd)
         cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{o_name}_{feature}_NoMCstats'
-        if run: os.system(cmd)
-        if run: os.system('mkdir -p impacts_noMCstats')
-        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
+        if run: run_cmd(cmd)
+        if run: run_cmd('mkdir -p impacts_noMCstats')
+        if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
 
     if run_year:
 
@@ -657,17 +669,17 @@ if __name__ == "__main__" :
         print(f"           Inside directory {eos_dir}\n")
 
         # [FIXME] Work-around for mkdir on eos
-        os.system(f'mkdir -p TMP_RESULTS_NONRES && cp index.php TMP_RESULTS_NONRES')
+        run_cmd(f'mkdir -p TMP_RESULTS_NONRES && cp index.php TMP_RESULTS_NONRES')
         for feature in features:
-            os.system(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
-            os.system(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
-            os.system(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
             for version in versions:
                 ver_short = version.split("ul_")[1].split("_Z")[0]
-                os.system(f'mkdir -p TMP_RESULTS_NONRES/{ver_short} && cp index.php TMP_RESULTS_NONRES/{ver_short}')
-                os.system(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+                run_cmd(f'mkdir -p TMP_RESULTS_NONRES/{ver_short} && cp index.php TMP_RESULTS_NONRES/{ver_short}')
+                run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
                 for category in categories:
-                    os.system(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
-        os.system(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
-        os.system(f'rm -r TMP_RESULTS_NONRES')
+                    run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+        run_cmd(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
+        run_cmd(f'rm -r TMP_RESULTS_NONRES')
 

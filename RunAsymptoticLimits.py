@@ -12,6 +12,8 @@ logging.getLogger('matplotlib').setLevel(logging.ERROR)
 
 
 '''
+ulimit -s unlimited
+
 python3 RunAsymptoticLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
     --cat cat_ZZ_elliptical_cut_90_resolved_1b,cat_ZZ_elliptical_cut_90_resolved_2b,cat_ZZ_elliptical_cut_90_boosted_noPNet \
     --feat dnn_ZZbbtt_kl_1 --featureDependsOnMass --prd prod_240528 --grp datacard_zz_res --move_eos --user_eos evernazz \
@@ -158,7 +160,7 @@ if __name__ == "__main__" :
         plt.xlabel(x_axis)
         plt.ylabel(r"95% CL on $\sigma \times \mathbf{\it{B}}$(" + y_axis + r") [pb]")
         plt.title("")
-        # plt.ylim(None,2*max(p2s_t))
+        plt.ylim(0.003,2*max(p2s_t))
         plt.grid(True, zorder = 4)
         plt.legend(loc='upper right', fontsize=18, frameon=True)
         plt.yscale('log')
@@ -485,7 +487,7 @@ if __name__ == "__main__" :
                         res.result()
 
         ############################################################################
-        print("\n ### INFO: Plot Combination of categories \n")
+        print("\n ### INFO: Plot Combination of years \n")
         ############################################################################
 
         for feature in features:
@@ -524,7 +526,7 @@ if __name__ == "__main__" :
             plt.savefig(maindir + f'/Res/FullRun2_{o_name}/{prd}/{feature}/Limits_FullRun2_{o_name}_split.png')
             # print(maindir + f'/Res/FullRun2_{o_name}/{prd}/{feature}/Limits_FullRun2_{o_name}_split.png')
 
-if options.move_eos:
+    if options.move_eos:
 
         eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/{o_name}/Limits/Res'
         user = options.user_eos
@@ -541,6 +543,7 @@ if options.move_eos:
             for version in versions:
                 ver_short = version.split("ul_")[1].split("_Z")[0]
                 os.system(f'mkdir -p TMP_RESULTS_RES/{ver_short} && cp index.php TMP_RESULTS_RES/{ver_short}')
+                os.system(f'cp ' + maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/Limits_*.p* TMP_RESULTS_RES/{ver_short}')
                 for category in categories:
                     os.system(f'cp ' + maindir + f'/Res/{version}/{prd}/{feature}/{category}/Combination_Ch/Limits_*.p* TMP_RESULTS_RES/{ver_short}')        
         os.system(f'rsync -rltv TMP_RESULTS_RES/* {user}@lxplus.cern.ch:{eos_dir}')

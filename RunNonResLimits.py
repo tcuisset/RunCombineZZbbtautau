@@ -35,10 +35,10 @@ python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,
     --move_eos --user_eos cuisset
 '''
 
-def run_cmd(cmd, run=True):
+def run_cmd(cmd, run=True, check=True):
     if run:
         try:
-            subprocess.run(cmd, shell=True, check=True)
+            subprocess.run(cmd, shell=True, check=check)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Command {cmd} failed with exit code {e.returncode}. Working directory : {os.getcwd()}") from None
 
@@ -72,7 +72,7 @@ if __name__ == "__main__" :
     makeFlag("--run_year",     dest="run_year",     default=True,             help='Combine years or not')
     makeFlag("--run_zh_comb_year",     dest="run_zh_comb_year",     default=False,             help='Run ZbbHtt & ZttHbb combination for Full Run2')
     makeFlag("--run_impacts",  dest="run_impacts",  default=True,             help='Make impact plots')
-    makeFlag("--run_impacts_noMCStat",  dest="run_impacts_statOnly",  default=False,             help='Make impact plots, but only without MC stat uncertainties (faster)')
+    makeFlag("--run_impacts_noMCStat",  dest="run_impacts_noMCStat",  default=False,             help='Make impact plots, but only without MC stat uncertainties (faster)')
     makeFlag("--plot_only",    dest="plot_only",    default=False)
     makeFlag("--move_eos",     dest="move_eos",     default=False)
     parser.add_argument("--user_eos",     dest="user_eos",     default='evernazz',       help='User Name for lxplus account')
@@ -588,9 +588,9 @@ if __name__ == "__main__" :
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
         print(cmd)
         if run: run_cmd(cmd)
-        if options.singleThread:
+        if True or options.singleThread:
             prefix_cmd = "combine "
-        else:
+        else: # weird things happen
             prefix_cmd = "combineTool.py --split-points 5 --job-mode=interactive --parallel=20 "
         cmd = prefix_cmd + f'-M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
         print(cmd)
@@ -841,7 +841,23 @@ if __name__ == "__main__" :
                 run_cmd(f'mkdir -p TMP_RESULTS_NONRES/{ver_short} && cp index.php TMP_RESULTS_NONRES/{ver_short}')
                 run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
                 for category in categories:
-                    run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+                    run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}', check=False)
         run_cmd(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
         run_cmd(f'rm -r TMP_RESULTS_NONRES')
+
+
+        if options.run_zh_comb_year:
+            eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/ZHComb/Limits/NonRes'
+            run_cmd(f'mkdir -p TMP_RESULTS_NONRES && cp index.php TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
+
+            versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
+            for version in versions_ZbbHtt:
+                version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
+                ver_short = version.split("ul_")[1].split("_Z")[0]
+                run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+            run_cmd(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
+            run_cmd(f'rm -r TMP_RESULTS_NONRES')
 

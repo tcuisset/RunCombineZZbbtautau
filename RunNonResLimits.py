@@ -586,7 +586,11 @@ if __name__ == "__main__" :
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
         print(cmd)
         if run: run_cmd(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        if options.singleThread:
+            prefix_cmd = "combine "
+        else:
+            prefix_cmd = "combineTool.py --split-points 5 --job-mode=interactive --parallel=20 "
+        cmd = prefix_cmd + f'-M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
         print(cmd)
         if run: run_cmd(cmd)
         cmd = f'combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'

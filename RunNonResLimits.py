@@ -50,18 +50,20 @@ if __name__ == "__main__" :
 
     import argparse
     parser = argparse.ArgumentParser("RunNonResLimits")
-    parser.add_argument("--run",          dest="run",          default=True)
+    def makeFlag(arg_name, **kwargs):
+        if arg_name.startswith("--"):
+            arg_name = arg_name[2:]
+        parser.add_argument(f"--{arg_name}", action='store_true', **kwargs)
+        parser.add_argument(f"--no_{arg_name}", action='store_false', **kwargs)
+    
+    makeFlag("--run",      dest="run",      default=True,             help='Run commands or do a dry-run')
     parser.add_argument("--ver",          dest="ver",          default='')
     parser.add_argument("--cat",          dest="cat",          default='')
     parser.add_argument("--prd",          dest="prd",          default='')
     parser.add_argument("--feat",         dest="feat",         default='dnn_ZZbbtt_kl_1')
     parser.add_argument("--grp",          dest="grp",          default='datacard_zz')
     parser.add_argument("--channels",     dest="channels",     default="etau,mutau,tautau")
-    def makeFlag(arg_name, **kwargs):
-        if arg_name.startswith("--"):
-            arg_name = arg_name[2:]
-        parser.add_argument(f"--{arg_name}", action='store_true', **kwargs)
-        parser.add_argument(f"--no_{arg_name}", action='store_false', **kwargs)
+
     makeFlag("--singleThread", default=False, help="Don't run in parallel, disable for debugging")
     makeFlag("--run_one",      dest="run_one",      default=True,             help='Run each channel or not')
     makeFlag("--run_ch",       dest="run_ch",       default=True,             help='Combine channels or not')

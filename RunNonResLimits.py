@@ -47,6 +47,9 @@ def run_cmd(cmd, run=True, check=True):
 #######################################################################
 
 if __name__ == "__main__" :
+    import matplotlib
+    matplotlib.use('Agg')
+
 
     import argparse
     parser = argparse.ArgumentParser("RunNonResLimits")

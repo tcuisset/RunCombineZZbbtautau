@@ -116,8 +116,8 @@ if __name__ == "__main__" :
     maindir = os.getcwd() 
 
     if "ZZ" in options.ver:       o_name = 'ZZbbtt'; process_tex = r"$X\rightarrow ZZ\rightarrow bb\tau\tau$";   x_axis = r"$m_{X}$ [GeV]"
-    elif "ZbbHtt" in options.ver: o_name = 'ZbbHtt'; process_tex = r"$Z'\rightarrow ZH\rightarrow bb\tau\tau$";  x_axis = r"$m_{Z'}$ [GeV]"
-    elif "ZttHbb" in options.ver: o_name = 'ZttHbb'; process_tex = r"$Z'\rightarrow ZH\rightarrow \tau\tau bb$"; x_axis = r"$m_{Z'}$ [GeV]"
+    elif "ZbbHtt" in options.ver: o_name = 'ZbbHtt'; process_tex = r"$Z'\rightarrow ZH$";  x_axis = r"$m_{Z'}$ [GeV]" # \rightarrow bb\tau\tau
+    elif "ZttHbb" in options.ver: o_name = 'ZttHbb'; process_tex = r"$Z'\rightarrow ZH$"; x_axis = r"$m_{Z'}$ [GeV]" # \rightarrow \tau\tau bb
 
     dict_ch_name = {"etau": "$\\tau_{e}\\tau_{h}$", "mutau": "$\\tau_{\\mu}\\tau_{h}$", "tautau": "$\\tau_{h}\\tau_{h}$"}
 

@@ -55,22 +55,45 @@ rsync -rltv /grid_mnt/data__data.polcms/cms/cuisset/ZHbbtautau/combine/RunCombin
 
 #########################
 ####################### Resonant limits
-cd ../CMSSW_11_3_4/ && cmsenv && cd - && ulimit -s unlimited && cd ResLimits_v10/
+cd ../CMSSW_11_3_4/ && cmsenv && cd - && ulimit -s unlimited && cd ResLimits_v10e/
 
+python3 ../RunAsymptoticLimits.py --ver ul_2016_ZbbHtt_v12,ul_2017_ZbbHtt_v12,ul_2018_ZbbHtt_v12 \
+    --cat cat_ZbbHtt_orthogonal_cut_90_resolved_1b,cat_ZbbHtt_orthogonal_cut_90_resolved_2b,cat_ZbbHtt_orthogonal_cut_90_boosted_noPNet \
+    --feat dnn_ZHbbtt_kl_1 --featureDependsOnMass --prd prod_240528 --grp datacard_res \
+    --mass 600,800,1000,1200,1400,2000,3000,3500,4000 --no_run_year
 
+# ZbbHtt
 python3 ../RunAsymptoticLimits.py --ver ul_2016_HIPM_ZbbHtt_v12,ul_2016_ZbbHtt_v12,ul_2017_ZbbHtt_v12,ul_2018_ZbbHtt_v12 \
     --cat cat_ZbbHtt_orthogonal_cut_90_resolved_1b,cat_ZbbHtt_orthogonal_cut_90_resolved_2b,cat_ZbbHtt_orthogonal_cut_90_boosted_noPNet \
     --feat dnn_ZHbbtt_kl_1 --featureDependsOnMass --prd prod_240528 --grp datacard_res \
-    --mass 600,800,1000,1200,1400,1600,1800,2000,2500,3000,3500,4000 
+    --mass 600,800,1000,1200,1400,2000,3000,3500,4000 
 
+# ZttHbb
 python3 ../RunAsymptoticLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,ul_2017_ZttHbb_v12,ul_2018_ZttHbb_v12 \
     --cat cat_ZttHbb_orthogonal_cut_90_resolved_1b,cat_ZttHbb_orthogonal_cut_90_resolved_2b,cat_ZttHbb_orthogonal_cut_90_boosted_noPNet \
     --feat dnn_ZHbbtt_kl_1 --featureDependsOnMass --prd prod_240528 --grp datacard_res \
-    --mass 600,800,1000,1200,1400,1600,1800,2000,2500,3000,3500,4000 
+    --mass 600,800,1000,1200,1400,2000,3000,3500,4000  
 
-python3 ../RunAsymptoticLimits.py --ver ul_2018_ZbbHtt_v12,ul_2018_ZttHbb_v12 \
+# ZH combination
+python3 ../RunAsymptoticLimits.py --ver ul_2018_ZbbHtt_v12,ul_2018_ZttHbb_v12,ul_2017_ZbbHtt_v12,ul_2017_ZttHbb_v12,ul_2016_ZbbHtt_v12,ul_2016_ZttHbb_v12,ul_2016_HIPM_ZbbHtt_v12,ul_2016_HIPM_ZttHbb_v12 \
     --cat cat_ZbbHtt_orthogonal_cut_90_resolved_1b,cat_ZbbHtt_orthogonal_cut_90_resolved_2b,cat_ZbbHtt_orthogonal_cut_90_boosted_noPNet \
     --feat dnn_ZHbbtt_kl_1 --featureDependsOnMass --prd prod_240528 --grp datacard_res \
-    --mass 600,800,1000,1200,1400,1600,1800,2000,2500,3000,3500,4000 --no_run_one --no_run_ch --no_run_cat --run_zh_comb_cat
+    --mass 600,800,1000,1200,1400,1600,1800,2000,2500,3000,3500,4000 --no_run_one --no_run_ch --no_run_cat --run_zh_comb_cat --run_zh_comb_year
 
 #     --move_eos --user_eos cuisset
+
+
+
+# impacts
+mkdir /grid_mnt/data__data.polcms/cms/cuisset/ZHbbtautau/combine/RunCombineZZbbtautau/ResLimits_v10d/Res/FullRun2_ZbbHtt/prod_240528/dnn_ZHbbtt_kl_1/Impacts
+cd /grid_mnt/data__data.polcms/cms/cuisset/ZHbbtautau/combine/RunCombineZZbbtautau/ResLimits_v10d/Res/FullRun2_ZbbHtt/prod_240528/dnn_ZHbbtt_kl_1/Impacts
+cp /grid_mnt/data__data.polcms/cms/cuisset/ZHbbtautau/combine/RunCombineZZbbtautau/ResLimits_v10d/Res/FullRun2_ZbbHtt/prod_240528/dnn_ZHbbtt_kl_1/M800/FullRun2_ZbbHtt_dnn_ZHbbtt_kl_1_os_iso.txt .
+
+text2workspace.py FullRun2_*_os_iso.txt -o model.root
+combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 --setParameterRanges r=0,2 --doInitialFit --robustFit 1 --exclude 'rgx{prop_bin.+}'
+combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 --setParameterRanges r=0,2 --doFits --robustFit 1 --parallel 50 --exclude 'rgx{prop_bin.+}'
+combineTool.py -M Impacts -d model.root -m 125 -o impacts.json
+plotImpacts.py -i impacts.json -o impacts
+mkdir impacts_root
+mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_root
+

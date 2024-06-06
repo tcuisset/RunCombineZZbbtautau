@@ -22,12 +22,16 @@ python3 RunNonResLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v
 
 python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZbbHtt_v12,ul_2016_ZbbHtt_v12,ul_2017_ZbbHtt_v12,ul_2018_ZbbHtt_v12 \
     --cat cat_ZbbHtt_elliptical_cut_90_resolved_1b,cat_ZbbHtt_elliptical_cut_90_resolved_2b,cat_ZbbHtt_elliptical_cut_90_boosted_noPNet \
-    --feat dnn_ZbbHtt_kl_1 --featureDependsOnMass --prd prod_... --grp datacard_zbbhtt \
+    --feat dnn_ZbbHtt_kl_1 --prd prod_... --grp datacard_zbbhtt \
     --move_eos --user_eos cuisset
+
+python3 RunNonResLimits.py --ver ul_2018_ZbbHtt_v12 \
+    --cat cat_ZbbHtt_orthogonal_cut_90_resolved_1b,cat_ZbbHtt_orthogonal_cut_90_resolved_2b,cat_ZbbHtt_orthogonal_cut_90_boosted_noPNet \
+    --feat dnn_ZHbbtt_kl_1 --prd prod_240528_nonres --grp datacard --move_eos --user_eos evernazz --user_cmt cuisset
 
 python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,ul_2017_ZttHbb_v12,ul_2018_ZttHbb_v12 \
     --cat cat_ZttHbb_elliptical_cut_90_resolved_1b,cat_ZttHbb_elliptical_cut_90_resolved_2b,cat_ZttHbb_elliptical_cut_90_boosted_noPNet \
-    --feat dnn_ZttHbb_kl_1 --featureDependsOnMass --prd prod_... --grp datacard_ztthbb \
+    --feat dnn_ZHbbtt_kl_1 --prd prod_... --grp datacard_ztthbb \
     --move_eos --user_eos cuisset
 '''
 
@@ -51,9 +55,11 @@ if __name__ == "__main__" :
     parser.add_option("--run_ch",       dest="run_ch",       default=True,             help='Combine channels or not')
     parser.add_option("--run_cat",      dest="run_cat",      default=True,             help='Combine categories or not')
     parser.add_option("--run_year",     dest="run_year",     default=True,             help='Combine years or not')
+    parser.add_option("--run_zh",       dest="run_zh",       default=False,            help='Combine years or not', action='store_true')
     parser.add_option("--plot_only",    dest="plot_only",    default=False,            action='store_true')
     parser.add_option("--move_eos",     dest="move_eos",     default=False,            action='store_true')
     parser.add_option("--user_eos",     dest="user_eos",     default='evernazz',       help='User Name for lxplus account')
+    parser.add_option("--user_cmt",     dest="user_cmt",     default='evernazz',      help='User Name for cmt folder')
     (options, args) = parser.parse_args()
 
     if ',' in options.ver:
@@ -84,11 +90,7 @@ if __name__ == "__main__" :
     run_cat = options.run_cat == True
     run_year = options.run_year == True
 
-    if os.environ["USER"] == 'evernazza':
-        cmtdir = '/data_CMS/cms/' + os.environ["USER"][1:] + '/cmt/CreateDatacards/'
-    else:
-        cmtdir = '/data_CMS/cms/' + os.environ["USER"] + '/cmt/CreateDatacards/'
-
+    cmtdir = '/data_CMS/cms/' + options.user_cmt + '/cmt/CreateDatacards/'
     maindir = os.getcwd() 
 
     if "ZZ" in options.ver:
@@ -188,10 +190,12 @@ if __name__ == "__main__" :
 
         print(" ### INFO: Create workspace")
         cmd = f'cd {datadir} && text2workspace.py {datafile} -o {ch_dir}/model.root &>{ch_dir}/text2workspace.log'
+        print(cmd)
         if run: os.system(cmd)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
         cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}/multiDimFit.log'
+        print(cmd)
         if run: os.system(cmd)
 
         LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
@@ -204,25 +208,25 @@ if __name__ == "__main__" :
         plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.png")
         plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.pdf")
 
-        if options.singleThread:
+        # if options.singleThread:
 
-            # Creates problems when parallelizing, but it's only to print out the significance so we can drop it
-            print(" ### INFO: Run significance extraction")
-            cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
-            if run: os.system(cmd)
-            if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
-            LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
-            a = GetLimit(LS_file)
+        #     # Creates problems when parallelizing, but it's only to print out the significance so we can drop it
+        #     print(" ### INFO: Run significance extraction")
+        #     cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 --pvalue -o {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root &> {ch_dir}/PValue.log'
+        #     if run: os.system(cmd)
+        #     # if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
+        #     LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
+        #     a = GetLimit(LS_file)
 
-            cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
-            if run: os.system(cmd)
-            if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
-            LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
-            b = GetLimit(LS_file)
+        #     cmd = f'cd {datadir} && combine -M Significance {datafile} -t -1 --expectSignal=1 -o {ch_dir}/higgsCombineTest.Significance.mH120.significance.root &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
+        #     if run: os.system(cmd)
+        #     # if run: os.system(f'mv {datadir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
+        #     LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
+        #     b = GetLimit(LS_file)
 
-            print(" ### INFO: Results for", feature, version, category, ch)
-            print(" ### p-value     = ", a)
-            print(" ### significane = ", b, "\n")
+        #     print(" ### INFO: Results for", feature, version, category, ch)
+        #     print(" ### p-value     = ", a)
+        #     print(" ### significane = ", b, "\n")
 
         if run: os.chdir(ch_dir)
 
@@ -433,6 +437,103 @@ if __name__ == "__main__" :
                 ver_short = version.split("ul_")[1].split("_Z")[0]
                 plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')
                 plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.pdf')
+
+    ################################################################################################################################
+    ################################################################################################################################
+    ################################################################################################################################
+
+    def run_comb_ZH(feature, version_ZbbHtt, version_ZttHbb):
+        """ Combination of ZbbHtt & ZttHbb for a single year """
+        version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
+        combdir = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/'
+        print(" ### INFO: Saving ZH combination in ", combdir)
+        if run: os.system('mkdir -p ' + combdir)
+
+        cmd = f'combineCards.py'
+        for version, short_name in [(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]:
+            cat_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+            cmd += f' {short_name}={cat_file}'
+        cmd += f' > {version_comb}_{feature}_os_iso.txt'
+        if run: os.chdir(combdir)
+        if run: os.system(cmd)
+
+        if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
+        else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
+    
+        cmd = f'text2workspace.py {version_comb}_{feature}_os_iso.txt -o model.root'
+        if run: os.system(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        if run: os.system(cmd)
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1'
+        if run: os.system(cmd)
+        cmd = f'combine -M Significance {version_comb}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version_comb}_{feature}.log'
+        if run: os.system(cmd)
+
+        cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
+            ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
+        if run: os.system(cmd)
+        cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
+            '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
+            '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
+        if run: os.system(cmd)
+
+    if run_zh_comb:
+        versions_ZbbHtt = []
+        versions_ZttHbb = []
+        for version in versions:
+            if "ZbbHtt" in version:
+                ver_ZttHbb = version.replace("ZbbHtt", "ZttHbb")
+                if ver_ZttHbb not in versions:
+                    raise RuntimeError(f"Whilst running ZH combination : {version} was found but not corresponding {ver_ZttHbb}")
+                versions_ZbbHtt.append(version)
+                versions_ZttHbb.append(ver_ZttHbb)
+
+        if not options.plot_only:
+
+            ############################################################################
+            print("\n ### INFO: Run Combination of ZH \n")
+            ############################################################################
+
+            if options.singleThread:
+                for feature in features:
+                    for ver_ZbbHtt, ver_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
+                        run_comb_ZH(feature, ver_ZbbHtt, ver_ZttHbb)
+            else:
+                with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
+                    futures = []
+                    for feature in features:
+                        for ver_ZbbHtt, ver_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
+                            futures.append(exc.submit(run_comb_ZH, feature, ver_ZbbHtt, ver_ZttHbb))
+                    for res in concurrent.futures.as_completed(futures):
+                        res.result()
+        
+        ############################################################################
+        print("\n ### INFO: Plot Combination of ZH \n")
+        ############################################################################
+
+        for feature in features:
+            for version_ZbbHtt, version_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
+                version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
+                fig = plt.figure(figsize=(10, 10))
+                cmap = plt.get_cmap('tab10')
+                for i, (version, short_name) in enumerate([(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]):
+                    cat_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+                    LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                    x, y = GetDeltaLL(LS_file)
+                    plt.plot(x, y, label=short_name, linewidth=3, color=cmap(i))
+                LS_file = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+                x, y = GetDeltaLL(LS_file)
+                plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
+                LS_file = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                x_stat, y_stat = GetDeltaLL(LS_file)
+                plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                plt.legend(loc='upper right', fontsize=18, frameon=True)
+                SetStyle(fig, x, cat_name, "", 8)
+                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version_comb}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+                ver_short = version.split("ul_")[1].split("_Z")[0]
+                plt.savefig(maindir + f'/NonRes/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.png')
+                plt.savefig(maindir + f'/NonRes/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.pdf')
+
 
     ################################################################################################################################
     ################################################################################################################################

@@ -152,8 +152,8 @@ if __name__ == "__main__" :
     def SetStyle(p2s_t, x_axis, y_axis, version, line1=""):
         if '2018' in version:          text_year = r'2018 - 59.7 fb$^{-1}$ (13 TeV)'
         elif '2017' in version:        text_year = r'2017 - 41.5 fb$^{-1}$ (13 TeV)'
-        elif '2016' in version:        text_year = r'2016 - 16.8 fb$^{-1}$ (13 TeV)'
         elif '2016_HIPM' in version:   text_year = r'2016 - 19.5 fb$^{-1}$ (13 TeV)'
+        elif '2016' in version:        text_year = r'2016 - 16.8 fb$^{-1}$ (13 TeV)'
         elif 'FullRun2' in version:    text_year = r'137.1 fb$^{-1}$ (13 TeV)'
         plt.text(0.03, 0.97, line1, ha="left", va="top", transform=plt.gca().transAxes, color="black", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
         mplhep.cms.label(data=False, rlabel=text_year)
@@ -462,9 +462,32 @@ if __name__ == "__main__" :
 
         SaveResults(combdir, mass)
 
-        # cmd = f'combineTool.py -M Impacts -d FullRun2_{o_name}_{feature}_os_iso.txt -m 125 --run blind --noFitAsimov {comb_options}'
-        # [FIXME] Missing impact plots
-                
+        print(" ### INFO: Produce Full Run 2 Impact Plots")
+
+        cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root &> text2workspace.log'
+        if run: os.system(cmd)
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
+        if run: os.system(cmd)
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
+        if run: os.system(cmd)
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
+        if run: os.system(cmd)
+        cmd = f'plotImpacts.py -i impacts.json -o Impacts_{o_name}_{feature}'
+        if run: os.system(cmd)
+        if run: os.system('mkdir -p impacts')
+        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
+
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+        if run: os.system(cmd)
+        cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{o_name}_{feature}_NoMCstats'
+        if run: os.system(cmd)
+        if run: os.system('mkdir -p impacts_noMCstats')
+        if run: os.system('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
+                                        
     if run_year:
 
         if not options.plot_only:

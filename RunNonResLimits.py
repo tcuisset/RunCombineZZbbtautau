@@ -22,7 +22,7 @@ ulimit -s unlimited
 
 python3 RunNonResLimits.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
     --cat cat_ZZ_elliptical_cut_90_resolved_1b,cat_ZZ_elliptical_cut_90_resolved_2b,cat_ZZ_elliptical_cut_90_boosted_noPNet \
-    --feat dnn_ZZbbtt_kl_1 --prd prod_240523 --grp datacard_zz --move_eos --user_eos evernazz
+    --feat dnn_ZZbbtt_kl_1 --prd prod_240523 --grp datacard_zz --move_eos --user_eos evernazz --num 0
 
 python3 RunNonResLimits.py --ver ul_2016_HIPM_ZbbHtt_v12,ul_2016_ZbbHtt_v12,ul_2017_ZbbHtt_v12,ul_2018_ZbbHtt_v12 \
     --cat cat_ZbbHtt_elliptical_cut_90_resolved_1b,cat_ZbbHtt_elliptical_cut_90_resolved_2b,cat_ZbbHtt_elliptical_cut_90_boosted_noPNet \
@@ -64,6 +64,7 @@ if __name__ == "__main__" :
     parser.add_argument("--feat",         dest="feat",                  default='dnn_ZZbbtt_kl_1')
     parser.add_argument("--grp",          dest="grp",                   default='datacard_zz')
     parser.add_argument("--channels",     dest="channels",              default="etau,mutau,tautau")
+    parser.add_argument("--num",          dest="num",                   default='',               help='Assign number to output directory for versioning')
     parser.add_argument("--user_eos",     dest="user_eos",              default='evernazz',       help='User Name for lxplus account')
     parser.add_argument("--user_cmt",     dest="user_cmt",              default='vernazza',       help='User Name for cmt folder')
     makeFlag("--run",                     dest="run",                   default=True,             help='Run commands or do a dry-run')
@@ -81,25 +82,17 @@ if __name__ == "__main__" :
     makeFlag("--singleThread",            dest="singleThread",          default=False,            help="Don't run in parallel, disable for debugging")
     options = parser.parse_args()
 
-    if ',' in options.ver:
-        versions = options.ver.split(',')
-    else:
-        versions = [options.ver]
+    if ',' in options.ver:  versions = options.ver.split(',')
+    else:                   versions = [options.ver]
     
-    if ',' in options.cat:
-        categories = options.cat.split(',')
-    else:
-        categories = [options.cat]
+    if ',' in options.cat:  categories = options.cat.split(',')
+    else:                   categories = [options.cat]
 
-    if ',' in options.feat:
-        features = options.feat.split(',')
-    else:
-        features = [options.feat]
+    if ',' in options.feat: features = options.feat.split(',')
+    else:                   features = [options.feat]
 
-    if ',' in options.channels:
-        channels = options.channels.split(',')
-    else:
-        channels = [options.channels]
+    if ',' in options.channels: channels = options.channels.split(',')
+    else:                       channels = [options.channels]
 
     prd = options.prd
     grp = options.grp
@@ -112,7 +105,7 @@ if __name__ == "__main__" :
     comb_2016 = options.comb_2016
 
     cmtdir = '/data_CMS/cms/' + options.user_cmt + '/cmt/CreateDatacards/'
-    maindir = os.getcwd() 
+    maindir = os.getcwd() + f'/NonRes{options.num}/'
 
     if "ZZ" in options.ver:
         o_name = 'ZZbbtt'; fancy_name = '$ZZ_{bb\\tau\\tau}$'
@@ -197,7 +190,7 @@ if __name__ == "__main__" :
             for version in versions:
                 for category in categories:
                     for channel in channels:
-                        odir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/{channel}'
+                        odir = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}'
                         if run: run_cmd('mkdir -p ' + odir)
                         ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.txt'
                         ch_root = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.root'
@@ -222,13 +215,13 @@ if __name__ == "__main__" :
 
             def run_comb_2016(feature, category, channel):
             
-                combdir = maindir + f'/NonRes/{v_combined}/{prd}/{feature}/{category}/{channel}'
+                combdir = maindir + f'/{v_combined}/{prd}/{feature}/{category}/{channel}'
                 print(" ### INFO: Saving combination in ", combdir)
                 if run: run_cmd('mkdir -p ' + combdir)
 
                 cmd = f'combineCards.py'
                 for version in [v_2016, v_2016_HIPM]:
-                    year_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/{channel}/{version}_{category}_{feature}_{grp}_{channel}_os_iso.txt'
+                    year_file = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/{version}_{category}_{feature}_{grp}_{channel}_os_iso.txt'
                     year = version.split("ul_")[1].split("_Z")[0]
                     cmd += f' Y{year}={year_file}'
                     cmd += f' > {v_combined}_{category}_{feature}_{grp}_{channel}_os_iso.txt'
@@ -275,7 +268,7 @@ if __name__ == "__main__" :
         if "KinFit" in feature: r_range = r_range_single_KinFit
         else:                   r_range = r_range_single
 
-        ch_dir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/{ch}'
+        ch_dir = maindir + f'/{version}/{prd}/{feature}/{category}/{ch}'
         run_cmd('mkdir -p ' + ch_dir)
 
         datafile = ch_dir + f'/{version}_{category}_{feature}_{grp}_{ch}_os_iso.txt'
@@ -297,6 +290,7 @@ if __name__ == "__main__" :
         ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
         plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.png")
         plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.pdf")
+        plt.close()
 
         if options.singleThread:
 
@@ -347,13 +341,13 @@ if __name__ == "__main__" :
 
     def run_comb_channels(feature, version, category):
 
-        combdir = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch'
+        combdir = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch'
         print(" ### INFO: Saving combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for ch in channels:
-            ch_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/{ch}/{version}_{category}_{feature}_{grp}_{ch}_os_iso.txt'
+            ch_file = maindir + f'/{version}/{prd}/{feature}/{category}/{ch}/{version}_{category}_{feature}_{grp}_{ch}_os_iso.txt'
             cmd += f' {ch}={ch_file}'
         cmd += f' > {version}_{feature}_{category}_os_iso.txt'
         if run: os.chdir(combdir)
@@ -418,21 +412,22 @@ if __name__ == "__main__" :
                     fig = plt.figure(figsize=(10, 10))
                     cmap = plt.get_cmap('tab10')
                     for i, ch in enumerate(channels):
-                        LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/{ch}/higgsCombineTest.MultiDimFit.mH120.root'
+                        LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/{ch}/higgsCombineTest.MultiDimFit.mH120.root'
                         x, y = GetDeltaLL(LS_file)
                         plt.plot(x, y, label=dict_ch_name[ch], linewidth=3, color=cmap(i))
-                    LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
                     x, y = GetDeltaLL(LS_file)
                     plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-                    LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
                     x_stat, y_stat = GetDeltaLL(LS_file)
                     plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
                     plt.legend(loc='upper right', fontsize=18, frameon=True)
                     SetStyle(fig, x, cat_name, "", 8)
-                    WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.Significance.mH120.root')
+                    WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.Significance.mH120.root')
                     ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
-                    plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.png')
-                    plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.pdf')
+                    plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.png')
+                    plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.pdf')
+                    plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -440,13 +435,13 @@ if __name__ == "__main__" :
 
     def run_comb_categories(feature, version):
 
-        combdir = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat'
+        combdir = maindir + f'/{version}/{prd}/{feature}/Combination_Cat'
         print(" ### INFO: Saving combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for category in categories:
-            cat_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/{version}_{feature}_{category}_os_iso.txt'
+            cat_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/{version}_{feature}_{category}_os_iso.txt'
             cat_short = category.split("_cut_90_")[1]
             cmd += f' {cat_short}={cat_file}'
         cmd += f' > {version}_{feature}_os_iso.txt'
@@ -504,25 +499,26 @@ if __name__ == "__main__" :
                 fig = plt.figure(figsize=(10, 10))
                 cmap = plt.get_cmap('tab10')
                 for i, category in enumerate(categories):
-                    LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
                     x, y = GetDeltaLL(LS_file)
                     if "boosted" in category:        cat_name = r"Boosted"
                     elif "resolved_1b" in category:  cat_name = r"Res 1b"
                     elif "resolved_2b" in category:  cat_name = r"Res 2b"
                     plt.plot(x, y, label=cat_name, linewidth=3, color=cmap(i))
-                LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-                LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
                 x_stat, y_stat = GetDeltaLL(LS_file)
                 plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
                 plt.legend(loc='upper right', fontsize=18, frameon=True)
                 year = version.split("ul_")[1].split("_Z")[0]
                 SetStyle(fig, x, year, "", 8)
-                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.Significance.mH120.root')
+                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.Significance.mH120.root')
                 ver_short = version.split("ul_")[1].split("_Z")[0]
-                plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')
-                plt.savefig(maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.pdf')
+                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')
+                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.pdf')
+                plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -531,13 +527,13 @@ if __name__ == "__main__" :
     def run_comb_ZH(feature, version_ZbbHtt, version_ZttHbb):
         """ Combination of ZbbHtt & ZttHbb for a single year """
         version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
-        combdir = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/'
+        combdir = maindir + f'/{version_comb}/{prd}/{feature}/'
         print(" ### INFO: Saving ZH combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for version, short_name in [(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]:
-            cat_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+            cat_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             cmd += f' {short_name}={cat_file}'
         cmd += f' > {version_comb}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
@@ -608,22 +604,23 @@ if __name__ == "__main__" :
                 fig = plt.figure(figsize=(10, 10))
                 cmap = plt.get_cmap('tab10')
                 for i, (version, short_name) in enumerate([(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]):
-                    cat_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
-                    LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                    cat_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                     x, y = GetDeltaLL(LS_file)
                     plt.plot(x, y, label=short_name, linewidth=3, color=cmap(i))
-                LS_file = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/{version_comb}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-                LS_file = maindir + f'/NonRes/{version_comb}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/{version_comb}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
                 x_stat, y_stat = GetDeltaLL(LS_file)
                 plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
                 plt.legend(loc='upper right', fontsize=18, frameon=True)
                 SetStyle(fig, x, "ZH Combination", "", 8)
-                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/{version_comb}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version_comb}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
                 ver_short = version.split("ul_")[1].split("_Z")[0]
-                plt.savefig(maindir + f'/NonRes/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.png')
-                plt.savefig(maindir + f'/NonRes/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.pdf')
+                plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.png')
+                plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.pdf')
+                plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -631,14 +628,14 @@ if __name__ == "__main__" :
 
     def run_comb_years(feature):
 
-        combdir = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}'
+        combdir = maindir + f'/FullRun2_{o_name}/{prd}/{feature}'
         print(" ### INFO: Saving combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for version in versions:
             year = version.split("ul_")[1].split("_Z")[0]
-            ver_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+            ver_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
                 cmd += f' Y{year}={ver_file}'
         cmd += f' > FullRun2_{o_name}_{feature}_os_iso.txt'
@@ -729,20 +726,21 @@ if __name__ == "__main__" :
             fig = plt.figure(figsize=(10, 10))
             cmap = plt.get_cmap('tab10')
             for i, version in enumerate(versions):
-                LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label=version.split("ul_")[1].split("_Z")[0], linewidth=3, color=cmap(i))
-            LS_file = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
             x, y = GetDeltaLL(LS_file)
             plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-            LS_file = maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
             x_stat, y_stat = GetDeltaLL(LS_file)
             plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
             plt.legend(loc='upper right', fontsize=18, frameon=True)
             SetStyle(fig, x, fancy_name, "", 8)
-            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
-            plt.savefig(maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.png')
-            plt.savefig(maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.pdf')
+            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+            plt.savefig(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.png')
+            plt.savefig(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.pdf')
+            plt.close()
 
 
     ################################################################################################################################
@@ -751,7 +749,7 @@ if __name__ == "__main__" :
 
     def run_comb_years_ZH(feature):
 
-        combdir = maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}'
+        combdir = maindir + f'/FullRun2_ZHComb/{prd}/{feature}'
         print(" ### INFO: Saving ZH FullRun2 combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
@@ -759,12 +757,12 @@ if __name__ == "__main__" :
         versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
         for version in versions_ZbbHtt:
             year = version.split("ul_")[1].split("_Z")[0]
-            ver_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+            ver_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
                 cmd += f' Y{year}_ZbbHtt={ver_file}'
         for version in versions_ZttHbb:
             year = version.split("ul_")[1].split("_Z")[0]
-            ver_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+            ver_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
                 cmd += f' Y{year}_ZttHbb={ver_file}'
         cmd += f' > FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt'
@@ -852,39 +850,41 @@ if __name__ == "__main__" :
             fig = plt.figure(figsize=(10, 10))
             cmap = plt.get_cmap('tab10')
             for i, version in enumerate(versions):
-                LS_file = maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label=version.split("ul_")[1].replace("_", " "), linewidth=3, color=cmap(i))
-            LS_file = maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
             x, y = GetDeltaLL(LS_file)
             plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-            LS_file = maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/FullRun2_ZHComb/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
             x_stat, y_stat = GetDeltaLL(LS_file)
             plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
             plt.legend(loc='upper right', fontsize=18, frameon=True)
             SetStyle(fig, x, fancy_name, "", 8)
-            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
-            plt.savefig(maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_allYears.png')
-            plt.savefig(maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_allYears.pdf')
+            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+            plt.savefig(maindir + f'/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_allYears.png')
+            plt.savefig(maindir + f'/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_allYears.pdf')
+            plt.close()
 
             # Plot only ZbbHtt / ZttHbb
             fig = plt.figure(figsize=(10, 10))
             cmap = plt.get_cmap('tab10')
             for i, version in enumerate(["ZbbHtt", "ZttHbb"]):
-                LS_file = maindir + f'/NonRes/FullRun2_{version}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+                LS_file = maindir + f'/FullRun2_{version}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
                 plt.plot(x, y, label=version, linewidth=3, color=cmap(i))
-            LS_file = maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
             x, y = GetDeltaLL(LS_file)
             plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-            LS_file = maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+            LS_file = maindir + f'/FullRun2_ZHComb/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
             x_stat, y_stat = GetDeltaLL(LS_file)
             plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
             plt.legend(loc='upper right', fontsize=18, frameon=True)
             SetStyle(fig, x, fancy_name, "", 8)
-            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
-            plt.savefig(maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_summary.png')
-            plt.savefig(maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_summary.pdf')
+            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/FullRun2_ZHComb/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+            plt.savefig(maindir + f'/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_summary.png')
+            plt.savefig(maindir + f'/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_FullRun2_ZHComb_summary.pdf')
+            plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -900,15 +900,15 @@ if __name__ == "__main__" :
         # [FIXME] Work-around for mkdir on eos
         run_cmd(f'mkdir -p TMP_RESULTS_NONRES && cp index.php TMP_RESULTS_NONRES')
         for feature in features:
-            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
-            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
-            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_{o_name}/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/FullRun2_{o_name}/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/FullRun2_{o_name}/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
             for version in versions:
                 ver_short = version.split("ul_")[1].split("_Z")[0]
                 run_cmd(f'mkdir -p TMP_RESULTS_NONRES/{ver_short} && cp index.php TMP_RESULTS_NONRES/{ver_short}')
-                run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+                run_cmd(f'cp ' + maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
                 for category in categories:
-                    run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}', check=False)
+                    run_cmd(f'cp ' + maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}', check=False)
         run_cmd(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
         run_cmd(f'rm -r TMP_RESULTS_NONRES')
 
@@ -916,15 +916,15 @@ if __name__ == "__main__" :
         if options.run_zh_comb_year:
             eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/ZHComb/Limits/NonRes'
             run_cmd(f'mkdir -p TMP_RESULTS_NONRES && cp index.php TMP_RESULTS_NONRES')
-            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
-            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
-            run_cmd(f'cp ' + maindir + f'/NonRes/FullRun2_ZHComb/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/FullRun2_ZHComb/{prd}/{feature}/DeltaNLL_*.p* TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/FullRun2_ZHComb/{prd}/{feature}/*_os_iso.txt TMP_RESULTS_NONRES')
+            run_cmd(f'cp ' + maindir + f'/FullRun2_ZHComb/{prd}/{feature}/Impacts* TMP_RESULTS_NONRES')
 
             versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
             for version in versions_ZbbHtt:
                 version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
                 ver_short = version.split("ul_")[1].split("_Z")[0]
-                run_cmd(f'cp ' + maindir + f'/NonRes/{version}/{prd}/{feature}/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
+                run_cmd(f'cp ' + maindir + f'/{version}/{prd}/{feature}/DeltaNLL*.p* TMP_RESULTS_NONRES/{ver_short}')
             run_cmd(f'rsync -rltv TMP_RESULTS_NONRES/* {user}@lxplus.cern.ch:{eos_dir}')
             run_cmd(f'rm -r TMP_RESULTS_NONRES')
 

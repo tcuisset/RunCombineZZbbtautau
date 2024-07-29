@@ -1,4 +1,4 @@
-import os,json,concurrent.futures,itertools
+import os,json,concurrent.futures,itertools,sys
 import pdb, csv, subprocess
 import numpy as np
 
@@ -108,7 +108,7 @@ if __name__ == "__main__" :
 
     prd = options.prd
     grp = options.grp
-    run = int(options.run) == 1
+    run = options.run
     run_copy = options.run_copy
     run_one = options.run_one
     run_ch = options.run_ch
@@ -161,7 +161,10 @@ if __name__ == "__main__" :
         with open(json_file_name, 'w') as json_file:
             json.dump(limis_dict, json_file, indent=2)
 
-    def GetLimits(limit_file_list):
+    def GetLimits(limit_file_list, remove_invalid=False):
+        """ Read from a list of json files the limit results 
+        If remove_invalid=True, will exclude the points with limit=-1 from the result
+        """
         mass = []; exp = []; m1s_t = []; p1s_t = []; m2s_t = []; p2s_t = []
         for limit_file in limit_file_list:
             try:
@@ -176,6 +179,14 @@ if __name__ == "__main__" :
                 p2s_t.append(mass_dict[first_key]['p2s_t'])
             except FileNotFoundError:
                 print(f"## INFO : plot skipping non-existent limit file {limit_file}")
+        if remove_invalid:
+            good_values = np.array(exp) > 0.
+            mass = np.array(mass)[good_values].tolist()
+            exp = np.array(exp)[good_values].tolist()
+            m1s_t = np.array(m1s_t)[good_values].tolist()
+            p1s_t = np.array(p1s_t)[good_values].tolist()
+            m2s_t = np.array(m2s_t)[good_values].tolist()
+            p2s_t = np.array(p2s_t)[good_values].tolist()
         return mass, exp, m1s_t, p1s_t, m2s_t, p2s_t
     
     def CheckLimits(limit_file):
@@ -600,7 +611,7 @@ if __name__ == "__main__" :
         """ Combination of ZbbHtt & ZttHbb for a single year and a given mass hypothesis """
         version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
         combdir = maindir + f'/{version_comb}/{prd}/{feature}/M{mass}'
-        print(" ### INFO: Saving combination in ", combdir)
+        print(" ### INFO: Saving ZH combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
@@ -623,42 +634,56 @@ if __name__ == "__main__" :
 
         SaveResults(combdir, mass)
 
+    def split_versions_ZH():
+        """ Split the input versions into ZbbHtt versions and ZttHbb versions """
+        versions_ZbbHtt = []
+        versions_ZttHbb = []
+        for version in versions:
+            if "ZbbHtt" in version:
+                ver_ZttHbb = version.replace("ZbbHtt", "ZttHbb")
+                if ver_ZttHbb not in versions:
+                    raise RuntimeError(f"Whilst running ZH combination : {version} was found but not corresponding {ver_ZttHbb}")
+                versions_ZbbHtt.append(version)
+                versions_ZttHbb.append(ver_ZttHbb)
+        return versions_ZbbHtt, versions_ZttHbb
+    
     if options.run_zh_comb_cat:
+        versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
 
         if not options.plot_only:
 
             ############################################################################
-            print("\n ### INFO: Run Combination of categories \n")
+            print("\n ### INFO: Run Combination ZH of categories \n")
             ############################################################################
 
             if options.singleThread:
                 for feature in features:
-                    for version in versions:
+                    for ver_ZbbHtt, ver_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
                         for mass in mass_points:
-                            run_comb_categories(maindir, cmtdir, feature, version, prd, mass, featureDependsOnMass)
+                            run_comb_ZH(maindir, cmtdir, feature, ver_ZbbHtt, ver_ZttHbb, prd, mass, featureDependsOnMass)
             else:
                 with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
                     futures = []
                     for feature in features:
-                        for version in versions:
+                        for ver_ZbbHtt, ver_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
                             for mass in mass_points:
-                                futures.append(exc.submit(run_comb_categories, maindir, cmtdir, feature, version, prd, mass, featureDependsOnMass))
+                                futures.append(exc.submit(run_comb_ZH, maindir, cmtdir, feature, ver_ZbbHtt, ver_ZttHbb, prd, mass, featureDependsOnMass))
                     for res in concurrent.futures.as_completed(futures):
                         res.result()
 
         ############################################################################
-        print("\n ### INFO: Plot Combination of categories \n")
+        print("\n ### INFO: Plot Combination ZH of categories \n")
         ############################################################################
 
         for feature in features:
-            for version in versions:
-
-                limit_file_list = [maindir + f'/{version}/{prd}/{feature}/Combination_Cat/M{mass}/limits.json'
+            for version_ZbbHtt, version_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
+                version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
+                limit_file_list = [maindir + f'/{version_comb}/{prd}/{feature}/M{mass}/limits.json'
                     for mass in mass_points]
                 mass, exp, m1s_t, p1s_t, m2s_t, p2s_t = GetLimits(limit_file_list)
                 
                 if len(mass) == 0:
-                    print(f"## INFO : skipping plot for {maindir}/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}_split due to no limits available")
+                    print(f"## INFO : skipping plot for {maindir}/{version_comb}/{prd}/{feature} due to no limits available")
                     continue
 
                 fig, ax = plt.subplots(figsize=(12,10))
@@ -667,29 +692,29 @@ if __name__ == "__main__" :
                     color = '#FFDF7Fff', label = "68% expected", zorder=2)
                 plt.fill_between(np.asarray(mass), np.asarray(p2s_t), np.asarray(m2s_t), 
                     color = '#85D1FBff', label = "95% expected", zorder=1)
-                SetStyle(p2s_t, x_axis, process_tex, version)
-                ver_short = version.split("ul_")[1].split("_Z")[0]
-                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}.pdf')
-                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}.png')
-                # print(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}.png')
+                SetStyle(p2s_t, x_axis, process_tex, version_comb)
+                ver_short = version_comb.split("ul_")[1].split("_Z")[0]
+                try:
+                    plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/Limits_{ver_short}.pdf')
+                    plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/Limits_{ver_short}.png')
+                except ValueError:
+                    pass # Math domain error due log scale
+                # print(maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}.png')
 
                 cmap = plt.get_cmap('tab10')
-                for i, category in enumerate(categories):
-
-                    if "boosted" in category:        cat_name = r"Boosted"
-                    elif "resolved_1b" in category:  cat_name = r"Res 1b"
-                    elif "resolved_2b" in category:  cat_name = r"Res 2b"
-                    else:                            cat_name = category
-
-                    limit_file_list = [maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/M{mass}/limits.json'
+                for i, (version, short_name) in enumerate([(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]):
+                    limit_file_list = [maindir + f'/{version}/{prd}/{feature}/Combination_Cat/M{mass}/limits.json'
                         for mass in mass_points]
                     mass, exp, m1s_t, p1s_t, m2s_t, p2s_t = GetLimits(limit_file_list)
-                    plt.plot(mass, exp, marker='o', linestyle='--', label = f"Expected {cat_name}", zorder=3, color=cmap(i))
+                    plt.plot(mass, exp, marker='o', linestyle='--', label = f"Expected {short_name}", zorder=3, color=cmap(i))
                 plt.legend(loc='upper right', fontsize=18, frameon=True)
-                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}_split.pdf')
-                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}_split.png')
-                # print(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}_split.png')
-                plt.close()
+                try:
+                    plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/Limits_{ver_short}_split.pdf')
+                    plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/Limits_{ver_short}_split.png')
+                    plt.close()
+                except ValueError:
+                    pass # Math domain error due log scale
+                # print(maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}_split.png')
 
     ##########################################################
     # RUN COMBINATION OF YEARS
@@ -818,6 +843,131 @@ if __name__ == "__main__" :
             # print(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/Limits_FullRun2_{o_name}_split.png')
             plt.close()
 
+    ##########################################################
+    # RUN COMBINATION OF ZbbHtt & ZttHbb for full run2
+    ##########################################################
+
+    def run_comb_years_ZH(maindir, cmtdir, feature, prd, mass, featureDependsOnMass):
+        """ Combination of ZbbHtt & ZttHbb for a single year and a given mass hypothesis """
+        versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
+        combdir = maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/M{mass}'
+        print(" ### INFO: Saving ZH combination in ", combdir)
+        if run: run_cmd('mkdir -p ' + combdir)
+
+        cmd = f'combineCards.py'
+        for version in versions_ZbbHtt:
+            year = version.split("ul_")[1].split("_Z")[0]
+            cat_file = maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/M{mass}/{version}_{feature}_os_iso.txt'
+            if not os.path.isfile(cat_file):
+                print("## WARNING : ignoring missing datacard " + cat_file + " in combination")
+                continue
+            cmd += f' Y{year}_ZbbHtt={cat_file}'
+        for version in versions_ZttHbb:
+            year = version.split("ul_")[1].split("_Z")[0]
+            cat_file = maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/M{mass}/{version}_{feature}_os_iso.txt'
+            if not os.path.isfile(cat_file):
+                print("## WARNING : ignoring missing datacard " + cat_file + " in combination")
+                continue
+            cmd += f' Y{year}_ZttHbb={cat_file}'
+        if not "=" in cmd:
+            print(f"## WARNING Skipping combination FullRun2_ZHComb/{prd}/{feature}/M{mass}")
+            return
+        cmd += f' > FullRun2_ZHComb_{feature}_os_iso.txt'
+        if run: os.chdir(combdir)
+        if run: run_cmd(cmd)
+
+        cmd = f'combine -M AsymptoticLimits FullRun2_ZHComb_{feature}_os_iso.txt --run blind --noFitAsimov {comb_options} &> combine.log'
+        if run: os.chdir(combdir)
+        if run: run_cmd(cmd, check=False)
+
+        SaveResults(combdir, mass)
+
+    if options.run_zh_comb_year:
+        if not options.plot_only:
+
+            ############################################################################
+            print("\n ### INFO: Run Combination ZH of years \n")
+            ############################################################################
+
+            if options.singleThread:
+                for feature in features:
+                        for mass in mass_points:
+                            run_comb_years_ZH(maindir, cmtdir, feature, prd, mass, featureDependsOnMass)
+            else:
+                with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
+                    futures = []
+                    for feature in features:
+                        for mass in mass_points:
+                            futures.append(exc.submit(run_comb_years_ZH, maindir, cmtdir, feature, prd, mass, featureDependsOnMass))
+                    for res in concurrent.futures.as_completed(futures):
+                        res.result()
+
+        ############################################################################
+        print("\n ### INFO: Plot Combination ZH of years \n")
+        ############################################################################
+
+        for feature in features:
+            limit_file_list = [maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/M{mass}/limits.json'
+                for mass in mass_points]
+            mass, exp, m1s_t, p1s_t, m2s_t, p2s_t = GetLimits(limit_file_list, remove_invalid=True)
+            
+            if len(mass) == 0:
+                print(f"## INFO : skipping plot for /Res/FullRun2_ZHComb/{prd}/{feature} due to no limits available")
+                continue
+
+            fig, ax = plt.subplots(figsize=(12,10))
+            plt.plot(mass, exp, color='k', marker='o', label = "Expected", zorder=3)
+            plt.fill_between(np.asarray(mass), np.asarray(p1s_t), np.asarray(m1s_t), 
+                color = '#FFDF7Fff', label = "68% expected", zorder=2)
+            plt.fill_between(np.asarray(mass), np.asarray(p2s_t), np.asarray(m2s_t), 
+                color = '#85D1FBff', label = "95% expected", zorder=1)
+            SetStyle(p2s_t, x_axis, process_tex, "FullRun2 ZHComb")
+            try:
+                plt.savefig(maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/Limits_FullRun2_ZHComb.pdf')
+                plt.savefig(maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/Limits_FullRun2_ZHComb.png')
+            except ValueError:
+                pass # Math domain error due log scale
+            # print(maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}.png')
+
+            # Overlaying with split in years
+            cmap = plt.get_cmap('tab10')
+            versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
+            for i, (version_ZbbHtt, version_ZttHbb) in enumerate(zip(versions_ZbbHtt, versions_ZttHbb)):
+                version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
+                short_name = version_ZbbHtt.split("ul_")[1].split("_Z")[0]
+                limit_file_list = [maindir + f'/Res/{version_comb}/{prd}/{feature}/M{mass}/limits.json'
+                    for mass in mass_points]
+                mass, exp, m1s_t, p1s_t, m2s_t, p2s_t = GetLimits(limit_file_list)
+                plt.plot(mass, exp, marker='o', linestyle='--', label = f"Expected {short_name}", zorder=3, color=cmap(i))
+            plt.legend(loc='upper right', fontsize=18, frameon=True)
+            try:
+                plt.savefig(maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/Limits_FullRun2_ZHComb_split.pdf')
+                plt.savefig(maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/Limits_FullRun2_ZHComb_split.png')
+            except ValueError:
+                pass # Math domain error due log scale
+            # print(maindir + f'/Res/{version}/{prd}/{feature}/Combination_Cat/Limits_{ver_short}_split.png')
+
+            # Overlaying with ZbbHtt / ZttHbb
+            fig, ax = plt.subplots(figsize=(12,10))
+            plt.plot(mass, exp, color='k', marker='o', label = "Expected", zorder=3)
+            plt.fill_between(np.asarray(mass), np.asarray(p1s_t), np.asarray(m1s_t), 
+                color = '#FFDF7Fff', label = "68% expected", zorder=2)
+            plt.fill_between(np.asarray(mass), np.asarray(p2s_t), np.asarray(m2s_t), 
+                color = '#85D1FBff', label = "95% expected", zorder=1)
+            SetStyle(p2s_t, x_axis, process_tex, "FullRun2 ZHComb")
+            versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
+            for i, (proc, short_name) in enumerate(zip(["ZbbHtt", "ZttHbb"], [r"$Z_{bb}H_{\tau\tau}$", r"$Z_{\tau\tau}H_{bb}$"])):
+                limit_file_list = [maindir + f'/Res/FullRun2_{proc}/{prd}/{feature}/M{mass}/limits.json'
+                    for mass in mass_points]
+                mass, exp, m1s_t, p1s_t, m2s_t, p2s_t = GetLimits(limit_file_list)
+                plt.plot(mass, exp, marker='o', linestyle='--', label = f"Expected {short_name}", zorder=3, color=cmap(i))
+            plt.legend(loc='upper right', fontsize=18, frameon=True)
+            try:
+                plt.savefig(maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/Limits_FullRun2_ZHComb_split_proc.pdf')
+                plt.savefig(maindir + f'/Res/FullRun2_ZHComb/{prd}/{feature}/Limits_FullRun2_ZHComb_split_proc.png')
+            except ValueError:
+                pass # Math domain error due log scale
+    
     if options.move_eos:
 
         eos_dir = f'/eos/user/e/evernazz/www/ZZbbtautau/B2GPlots/2024_06_14/{o_name}/Limits/Res'

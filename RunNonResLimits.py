@@ -64,6 +64,7 @@ if __name__ == "__main__" :
     parser.add_argument("--feat",         dest="feat",                  default='dnn_ZZbbtt_kl_1')
     parser.add_argument("--grp",          dest="grp",                   default='datacard_zz')
     parser.add_argument("--channels",     dest="channels",              default="etau,mutau,tautau")
+    parser.add_argument("--exclude",      dest="exclude",      default="", help="Comma-separated datacard paths to exclude from channel combination (datacard path are matched with endwith)")
     parser.add_argument("--num",          dest="num",                   default='',               help='Assign number to output directory for versioning')
     parser.add_argument("--user_eos",     dest="user_eos",              default='evernazz',       help='User Name for lxplus account')
     parser.add_argument("--user_cmt",     dest="user_cmt",              default='vernazza',       help='User Name for cmt folder')
@@ -96,7 +97,8 @@ if __name__ == "__main__" :
 
     prd = options.prd
     grp = options.grp
-    run = int(options.run) == 1
+    exclude = options.exclude.split(",")
+    run = options.run
     run_one = options.run_one
     run_ch = options.run_ch
     run_cat = options.run_cat
@@ -286,11 +288,14 @@ if __name__ == "__main__" :
 
         fig = plt.figure(figsize=(10, 10))
         plt.plot(x, y, label='Data', color='red', linewidth=3)
-        SetStyle(fig, x, cat_name, dict_ch_name[ch])
-        ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
-        plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.png")
-        plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.pdf")
-        plt.close()
+        try:
+            SetStyle(fig, x, cat_name, dict_ch_name[ch])
+            ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
+            plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.png")
+            plt.savefig(f"{ch_dir}/DeltaNLL_{ver_short}_{cat_short}_{ch}.pdf")
+            plt.close()
+        except IndexError:
+            print(f"########## ERROR : plot of {version} {category} {ch} FAILED")
 
         if options.singleThread:
 

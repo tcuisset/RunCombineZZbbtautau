@@ -34,7 +34,6 @@ python3 RunNonResLimitsTTRate.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v1
     --feat dnn_ZHbbtt_kl_1 --prd prod_... --grp datacard_ztthbb \
     --move_eos --user_eos cuisset --user_cmt cuisset
 
-
 python3 RunNonResLimitsTTRate.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_2017_ZZ_v12,ul_2018_ZZ_v12 \
     --cat cat_ZZ_elliptical_cut_90_resolved_1b,cat_ZZ_elliptical_cut_90_resolved_2b,cat_ZZ_elliptical_cut_90_boosted_noPNet \
     --cr_cat cat_ZZ_elliptical_cut_90_CR_resolved_1b,cat_ZZ_elliptical_cut_90_CR_resolved_2b,cat_ZZ_elliptical_cut_90_CR_boosted_noPNet \
@@ -48,13 +47,13 @@ python3 RunNonResLimitsTTRate.py --ver ul_2016_ZZ_v12,ul_2016_HIPM_ZZ_v12,ul_201
 '''
 
 def run_cmd(cmd, run=True, check=True):
+    print(cmd)
     if run:
-        print(cmd)
         # pdb.set_trace()
-        # try:
-        #     subprocess.run(cmd, shell=True, check=check, stdout=subprocess.DEVNULL)
-        # except subprocess.CalledProcessError as e:
-        #     raise RuntimeError(f"Command {cmd} failed with exit code {e.returncode}. Working directory : {os.getcwd()}") from None
+        try:
+            subprocess.run(cmd, shell=True, check=check, stdout=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Command {cmd} failed with exit code {e.returncode}. Working directory : {os.getcwd()}") from None
 
 def GetCatShort(category):
     if 'resolved_1b' in category: cat = 'res1b'
@@ -93,7 +92,7 @@ if __name__ == "__main__" :
     parser.add_argument("--user_cmt",     dest="user_cmt",              default='vernazza',       help='User Name for cmt folder')
     parser.add_argument("--TTrate",       dest="TTrate",                default=False,            help="Use CR to constrain tt-bar normalisation", action='store_true')
     makeFlag("--run",                     dest="run",                   default=True,             help='Run commands or do a dry-run')
-    makeFlag("--comb_2016",               dest="comb_2016",             default=True,            help='Combine 2016 and 2016_HIPM')
+    makeFlag("--comb_2016",               dest="comb_2016",             default=True,             help='Combine 2016 and 2016_HIPM')
     makeFlag("--run_cp",                  dest="run_cp",                default=True,             help='Run copy of datacards')
     makeFlag("--run_one",                 dest="run_one",               default=True,             help='Run each channel or not')
     makeFlag("--run_ch",                  dest="run_ch",                default=True,             help='Combine channels or not')
@@ -131,6 +130,8 @@ if __name__ == "__main__" :
 
         if ',' in options.cr_cat:  cr_categories = options.cr_cat.split(',')
         else:                      cr_categories = [options.cr_cat]
+    else:
+        cr_categories = []
 
     prd = options.prd
     grp = options.grp
@@ -386,23 +387,28 @@ if __name__ == "__main__" :
             print(" ### significane = ", b, "\n")
 
         if options.TTrate:
-            print(" ### INFO: Run Single Channel Impact")
-            cmd = f'cd {ch_dir} &&      combineTool.py -M Impacts -d {ch_dir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {ch_dir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
 
-            cmd = f'cd {ch_dir} &&      combineTool.py -M Impacts -d {ch_dir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {ch_dir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
+            if options.run_impacts or options.run_impacts_noMCStat:
+                print(" ### INFO: Run Single Channel Impact")
+                cmd = f'cd {ch_dir} &&      combineTool.py -M Impacts -d {ch_dir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {ch_dir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
 
-            cmd = f'cd {ch_dir} &&      combineTool.py -M Impacts -d {ch_dir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {ch_dir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --parallel 50 -o {ch_dir}/impacts.json'
-            run_cmd(cmd, run)
+                cmd = f'cd {ch_dir} &&      combineTool.py -M Impacts -d {ch_dir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {ch_dir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
 
-            cmd = f'plotImpacts.py -i {ch_dir}/impacts.json -o Impacts'
-            run_cmd(cmd, run)
-            run_cmd(f'mkdir -p {ch_dir}/impacts')
-            run_cmd(f'mv {ch_dir}/text2workspace.log {ch_dir}/asimov.log {ch_dir}/multiDimFit.log {ch_dir}/higgsCombine_paramFit* {ch_dir}/higgsCombine_initialFit* {ch_dir}/impacts')
+                cmd = f'cd {ch_dir} &&      combineTool.py -M Impacts -d {ch_dir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {ch_dir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --parallel 50 -o {ch_dir}/impacts.json'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'plotImpacts.py -i {ch_dir}/impacts.json -o Impacts'
+                run_cmd(cmd, run)
+                run_cmd(f'mkdir -p {ch_dir}/impacts')
+                run_cmd(f'mv {ch_dir}/text2workspace.log {ch_dir}/asimov.log {ch_dir}/multiDimFit.log {ch_dir}/higgsCombine_paramFit* {ch_dir}/higgsCombine_initialFit* {ch_dir}/impacts')
 
         if run: os.chdir(ch_dir)
 
@@ -496,24 +502,6 @@ if __name__ == "__main__" :
             cmd = f'cd {combdir} &&         combine -M Significance {version}_{feature}_{category}_os_iso.txt -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root {fit_options}         &> Significance_{version}_{feature}_{category}.log'
             run_cmd(cmd, run)
 
-            print(" ### INFO: Run Channel Combination Impact")
-            cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --parallel 50 -o impacts.json'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} && plotImpacts.py -i impacts.json -o Impacts'
-            run_cmd(cmd, run)
-            run_cmd(f'mkdir -p {combdir}/impacts')
-            run_cmd(f'mv {combdir}/text2workspace.log {combdir}/asimov.log {combdir}/multiDimFit_singles.log {combdir}/multiDimFit_grid.log {combdir}/higgsCombine_paramFit* {combdir}/higgsCombine_initialFit* {combdir}/impacts')
-
             cmd = f'cd {combdir} &&         combine -M MultiDimFit {combdir}/model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace' + \
                 f' -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root --X-rtd MINIMIZER_no_analytic        &>MultiDimFit.log'
             run_cmd(cmd, run)
@@ -521,6 +509,28 @@ if __name__ == "__main__" :
                 f' --saveWorkspace -n .scan.with_syst.statonly_correct --algo grid --points 100' + \
                 f' --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root --X-rtd MINIMIZER_no_analytic      &>MultiDimFit_statOnly.log'
             run_cmd(cmd, run)
+
+            if options.run_impacts or options.run_impacts_noMCStat:
+                print(" ### INFO: Run Channel Combination Impact")
+                cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --parallel 50 -o impacts.json'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} && plotImpacts.py -i impacts.json -o Impacts'
+                run_cmd(cmd, run)
+                run_cmd(f'mkdir -p {combdir}/impacts')
+                run_cmd(f'mv {combdir}/text2workspace.log {combdir}/asimov.log {combdir}/multiDimFit_singles.log {combdir}/multiDimFit_grid.log {combdir}/higgsCombine_paramFit* {combdir}/higgsCombine_initialFit* {combdir}/impacts')
 
         else:
     
@@ -648,24 +658,6 @@ if __name__ == "__main__" :
             cmd = f'cd {combdir} &&         combine -M Significance {version}_{feature}_os_iso.txt -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root {fit_options}        &> Significance_{version}_{feature}_{category}.log'
             run_cmd(cmd, run)
 
-            print(" ### INFO: Run Category Combination Impact")
-            cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --parallel 50 -o impacts.json'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} &&         plotImpacts.py -i {combdir}/impacts.json -o Impacts'
-            run_cmd(cmd, run)
-            run_cmd(f'mkdir -p {combdir}/impacts')
-            run_cmd(f'mv {combdir}/text2workspace.log {combdir}/asimov.log {combdir}/multiDimFit_singles.log {combdir}/multiDimFit_grid.log {combdir}/higgsCombine_paramFit* {combdir}/higgsCombine_initialFit* {combdir}/impacts')
-
             cmd = f'cd {combdir} &&         combine -M MultiDimFit {combdir}/model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace' + \
                 f' -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root --X-rtd MINIMIZER_no_analytic        &>MultiDimFit.log'
             run_cmd(cmd, run)
@@ -673,6 +665,28 @@ if __name__ == "__main__" :
                 f' --saveWorkspace -n .scan.with_syst.statonly_correct --algo grid --points 100' + \
                 f' --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root --X-rtd MINIMIZER_no_analytic      &>MultiDimFit_statOnly.log'
             run_cmd(cmd, run)
+
+            if options.run_impacts or options.run_impacts_noMCStat:
+                print(" ### INFO: Run Category Combination Impact")
+                cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} &&         combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --parallel 50 -o impacts.json'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} &&         plotImpacts.py -i {combdir}/impacts.json -o Impacts'
+                run_cmd(cmd, run)
+                run_cmd(f'mkdir -p {combdir}/impacts')
+                run_cmd(f'mv {combdir}/text2workspace.log {combdir}/asimov.log {combdir}/multiDimFit_singles.log {combdir}/multiDimFit_grid.log {combdir}/higgsCombine_paramFit* {combdir}/higgsCombine_initialFit* {combdir}/impacts')
 
         else:
             cmd = f'cd {combdir} &&         text2workspace.py {combdir}/{version}_{feature}_os_iso.txt -o {combdir}/model.root      &>text2workspace.log'
@@ -858,6 +872,7 @@ if __name__ == "__main__" :
         run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
+        print("THERE 2:", versions)
         for version in versions:
             ver_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
@@ -910,24 +925,6 @@ if __name__ == "__main__" :
             cmd = f'cd {combdir} && combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root {fit_options} &> Significance_{version}_{feature}_{category}.log'
             run_cmd(cmd, run)
 
-            print(" ### INFO: Run Year Combination Impact")
-            cmd = f'cd {combdir} && combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} && combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} && combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
-            cmd += f'-m 125 --parallel 50 -o impacts.json'
-            run_cmd(cmd, run)
-
-            cmd = f'cd {combdir} && plotImpacts.py -i {combdir}/impacts.json -o Impacts'
-            run_cmd(cmd, run)
-            run_cmd(f'mkdir -p {combdir}/impacts')
-            run_cmd(f'mv {combdir}/text2workspace.log {combdir}/asimov.log {combdir}/multiDimFit_singles.log {combdir}/multiDimFit_grid.log {combdir}/higgsCombine_paramFit* {combdir}/higgsCombine_initialFit* {combdir}/impacts')
-
             cmd = f'cd {combdir} && combine -M MultiDimFit {combdir}/model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace' + \
                 f' -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root --X-rtd MINIMIZER_no_analytic &>MultiDimFit.log'
             run_cmd(cmd, run)
@@ -935,6 +932,30 @@ if __name__ == "__main__" :
                 f' --saveWorkspace -n .scan.with_syst.statonly_correct --algo grid --points 100' + \
                 f' --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root --X-rtd MINIMIZER_no_analytic &>MultiDimFit_statOnly.log'
             run_cmd(cmd, run)
+
+            if options.run_impacts or options.run_impacts_noMCStat:
+                print(" ### INFO: Run Year Combination Impact")
+                cmd = f'cd {combdir} && combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doInitialFit --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} && combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --doFits --robustFit 1 --parallel 50 {fit_options}'
+                if options.run_impacts_noMCStat: cmd += r" --exclude 'rgx{prop_bin.+}'"
+                run_cmd(cmd, run)
+
+                cmd = f'cd {combdir} && combineTool.py -M Impacts -d {combdir}/model.root -v 3 -t -1 --toysFrequentist --toysFile {combdir}/higgsCombine.asimov.GenerateOnly.mH120.123456.root '
+                cmd += f'-m 125 --parallel 50 -o impacts.json'
+                if options.run_impacts_noMCStat: cmd += r" -o impacts_noMCstats.json --exclude 'rgx{prop_bin.+}'"
+                else: cmd += r" -o impacts.json"
+                run_cmd(cmd, run)
+
+                if options.run_impacts_noMCStat: cmd = f'cd {combdir} && plotImpacts.py -i {combdir}/impacts_noMCstats.json -o Impacts_noMCstats'
+                else: cmd = f'cd {combdir} && plotImpacts.py -i {combdir}/impacts.json -o Impacts'
+                run_cmd(cmd, run)
+                run_cmd(f'mkdir -p {combdir}/impacts')
+                run_cmd(f'mv {combdir}/text2workspace.log {combdir}/asimov.log {combdir}/multiDimFit_singles.log {combdir}/multiDimFit_grid.log {combdir}/higgsCombine_paramFit* {combdir}/higgsCombine_initialFit* {combdir}/impacts')
 
         else:
         

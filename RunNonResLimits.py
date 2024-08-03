@@ -36,11 +36,21 @@ python3 RunNonResLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,ul_2
 '''
 
 def run_cmd(cmd, run=True, check=True):
+    # print('\n', cmd)
     if run:
         try:
-            subprocess.run(cmd, shell=True, check=check)
+            subprocess.run(cmd, shell=True, check=check, stdout=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Command {cmd} failed with exit code {e.returncode}. Working directory : {os.getcwd()}") from None
+
+def GetCatShort(category):
+    if 'resolved_1b' in category: cat = 'res1b'
+    if 'resolved_2b' in category: cat = 'res2b'
+    if 'boosted' in category: cat = 'boosted'
+    return cat
+
+def GetYear(version):
+    return version.split("ul_")[1].split("_Z")[0]
 
 #######################################################################
 ######################### SCRIPT BODY #################################
@@ -69,6 +79,7 @@ if __name__ == "__main__" :
     parser.add_argument("--user_cmt",     dest="user_cmt",              default='vernazza',       help='User Name for cmt folder')
     makeFlag("--run",                     dest="run",                   default=True,             help='Run commands or do a dry-run')
     makeFlag("--comb_2016",               dest="comb_2016",             default=True,             help='Combine 2016 and 2016_HIPM')
+    makeFlag("--run_cp",                  dest="run_cp",                default=True,             help='Run copy of datacards')
     makeFlag("--run_one",                 dest="run_one",               default=True,             help='Run each channel or not')
     makeFlag("--run_ch",                  dest="run_ch",                default=True,             help='Combine channels or not')
     makeFlag("--run_cat",                 dest="run_cat",               default=True,             help='Combine categories or not')
@@ -78,8 +89,10 @@ if __name__ == "__main__" :
     makeFlag("--run_impacts",             dest="run_impacts",           default=True,             help='Make impact plots')
     makeFlag("--run_impacts_noMCStat",    dest="run_impacts_noMCStat",  default=False,            help='Make impact plots, but only without MC stat uncertainties (faster)')
     makeFlag("--plot_only",               dest="plot_only",             default=False,            help='Skip all combine commands and plot only')
+    makeFlag("--only_cards",              dest="only_cards",            default=False,            help='Skip all combine commands and plot only')
     makeFlag("--move_eos",                dest="move_eos",              default=False,            help='Move results to eos')
     makeFlag("--singleThread",            dest="singleThread",          default=False,            help="Don't run in parallel, disable for debugging")
+    makeFlag("--unblind",                 dest="unblind",               default=False,            help="Picke the unblinded datacards and run unblinded limits")
     options = parser.parse_args()
 
     if ',' in options.ver:  versions = options.ver.split(',')
@@ -98,6 +111,7 @@ if __name__ == "__main__" :
     grp = options.grp
     run = int(options.run) == 1
     run_one = options.run_one
+    run_cp = options.run_cp
     run_ch = options.run_ch
     run_cat = options.run_cat
     run_zh_comb_cat = options.run_zh_comb_cat 
@@ -162,8 +176,6 @@ if __name__ == "__main__" :
         plt.text(0.03, 0.91, text, ha='left', va='top', transform=plt.gca().transAxes, fontsize='small',
             bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
         sig = GetLimit(sig_file)
-        # plt.text(0.03, 0.85, f"Significance = {sig:.{round}f}$\sigma$", ha='left', va='top', transform=plt.gca().transAxes, fontsize='small',
-        #     bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
     
     def GetDeltaLL(LS_file):
         file = uproot.open(LS_file)
@@ -181,27 +193,25 @@ if __name__ == "__main__" :
         limit_value = limit_tree["limit"].array()[0]
         return limit_value
 
-    ############################################################################
-    print("\n ### INFO: Copy all datacards \n")
-    ############################################################################
+    if run_cp:
 
-    if run_one:
+        ############################################################################
+        print("\n ### INFO: Copy all datacards \n")
+        ############################################################################
+
         for feature in features:
             for version in versions:
                 for category in categories:
                     for channel in channels:
                         odir = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}'
-                        if run: run_cmd('mkdir -p ' + odir)
+                        run_cmd('mkdir -p ' + odir)
                         ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.txt'
                         ch_root = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.root'
                         run_cmd(f'cp {ch_file} {odir}/{version}_{category}_{feature}_{grp}_{channel}_os_iso.txt')
-                        run_cmd(f'cp {ch_root} {odir}')
 
     ################################################################################################################################
     ################################################################################################################################
     ################################################################################################################################
-
-    # run combination of 2016 and 2016_HIPM
 
     if comb_2016:
 
@@ -217,7 +227,7 @@ if __name__ == "__main__" :
             
                 combdir = maindir + f'/{v_combined}/{prd}/{feature}/{category}/{channel}'
                 print(" ### INFO: Saving combination in ", combdir)
-                if run: run_cmd('mkdir -p ' + combdir)
+                run_cmd('mkdir -p ' + combdir)
 
                 cmd = f'combineCards.py'
                 for version in [v_2016, v_2016_HIPM]:
@@ -226,29 +236,28 @@ if __name__ == "__main__" :
                     cmd += f' Y{year}={year_file}'
                     cmd += f' > {v_combined}_{category}_{feature}_{grp}_{channel}_os_iso.txt'
                 if run: os.chdir(combdir)
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
 
-            if run_one:
-                if not options.plot_only:
+            if not options.plot_only and (options.run_one or options.only_cards):
+    
+                ############################################################################
+                print("\n ### INFO: Run Combination of 2016 and 2016_HIPM \n")
+                ############################################################################
 
-                    ############################################################################
-                    print("\n ### INFO: Run Combination of 2016 and 2016_HIPM \n")
-                    ############################################################################
-
-                    if options.singleThread:
+                if options.singleThread:
+                    for feature in features:
+                        for category in categories:
+                            for channel in channels:
+                                run_comb_2016(feature, category, channel)
+                else:
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
+                        futures = []
                         for feature in features:
                             for category in categories:
                                 for channel in channels:
                                     run_comb_2016(feature, category, channel)
-                    else:
-                        with concurrent.futures.ProcessPoolExecutor(max_workers=15) as exc:
-                            futures = []
-                            for feature in features:
-                                for category in categories:
-                                    for channel in channels:
-                                        run_comb_2016(feature, category, channel)
-                            for res in concurrent.futures.as_completed(futures):
-                                res.result()
+                        for res in concurrent.futures.as_completed(futures):
+                            res.result()
 
             versions.remove(v_2016) 
             versions.remove(v_2016_HIPM)
@@ -275,11 +284,11 @@ if __name__ == "__main__" :
 
         print(" ### INFO: Create workspace")
         cmd = f'cd {ch_dir} && text2workspace.py {datafile} -o {ch_dir}/model.root &>{ch_dir}/text2workspace.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
         cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}/multiDimFit.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
         x, y = GetDeltaLL(LS_file)
@@ -297,14 +306,14 @@ if __name__ == "__main__" :
             # Creates problems when parallelizing, but it's only to print out the significance so we can drop it
             print(" ### INFO: Run significance extraction")
             cmd = f'cd {ch_dir} && combine -M Significance {datafile} -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
-            if run: run_cmd(cmd)
-            if run: run_cmd(f'mv {ch_dir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
+            run_cmd(cmd, run)
+            run_cmd(f'mv {ch_dir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
             a = GetLimit(LS_file)
 
             cmd = f'cd {ch_dir} && combine -M Significance {datafile} -t -1 --expectSignal=1 &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
-            if run: run_cmd(cmd)
-            if run: run_cmd(f'mv {ch_dir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
+            run_cmd(cmd, run)
+            run_cmd(f'mv {ch_dir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
             b = GetLimit(LS_file)
 
@@ -314,9 +323,11 @@ if __name__ == "__main__" :
 
         if run: os.chdir(ch_dir)
 
-    if run_one:
+    if run_one and not options.only_cards:
 
+        ############################################################################
         print("\n ### INFO: Run Single Limits\n")
+        ############################################################################
 
         if options.singleThread:
             for feature in features:
@@ -343,7 +354,7 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch'
         print(" ### INFO: Saving combination in ", combdir)
-        if run: run_cmd('mkdir -p ' + combdir)
+        run_cmd('mkdir -p ' + combdir, run)
 
         cmd = f'combineCards.py'
         for ch in channels:
@@ -351,27 +362,29 @@ if __name__ == "__main__" :
             cmd += f' {ch}={ch_file}'
         cmd += f' > {version}_{feature}_{category}_os_iso.txt'
         if run: os.chdir(combdir)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
+
+        if options.only_cards: return True
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
         cmd = f'text2workspace.py {version}_{feature}_{category}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M Significance {version}_{feature}_{category}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}_{category}.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
     if run_ch:
 
@@ -396,38 +409,40 @@ if __name__ == "__main__" :
                     for res in concurrent.futures.as_completed(futures):
                         res.result()
 
-        ############################################################################
-        print("\n ### INFO: Plot Combination of channels \n")
-        ############################################################################
+        if not options.only_cards:
 
-        for feature in features:
-            for version in versions:
-                for category in categories:
+            ############################################################################
+            print("\n ### INFO: Plot Combination of channels \n")
+            ############################################################################
 
-                    if "boosted" in category:        cat_name = r"Boosted"
-                    elif "resolved_1b" in category:  cat_name = r"Res 1b"
-                    elif "resolved_2b" in category:  cat_name = r"Res 2b"
-                    else:                            cat_name = category
+            for feature in features:
+                for version in versions:
+                    for category in categories:
 
-                    fig = plt.figure(figsize=(10, 10))
-                    cmap = plt.get_cmap('tab10')
-                    for i, ch in enumerate(channels):
-                        LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/{ch}/higgsCombineTest.MultiDimFit.mH120.root'
+                        if "boosted" in category:        cat_name = r"Boosted"
+                        elif "resolved_1b" in category:  cat_name = r"Res 1b"
+                        elif "resolved_2b" in category:  cat_name = r"Res 2b"
+                        else:                            cat_name = category
+
+                        fig = plt.figure(figsize=(10, 10))
+                        cmap = plt.get_cmap('tab10')
+                        for i, ch in enumerate(channels):
+                            LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/{ch}/higgsCombineTest.MultiDimFit.mH120.root'
+                            x, y = GetDeltaLL(LS_file)
+                            plt.plot(x, y, label=dict_ch_name[ch], linewidth=3, color=cmap(i))
+                        LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
                         x, y = GetDeltaLL(LS_file)
-                        plt.plot(x, y, label=dict_ch_name[ch], linewidth=3, color=cmap(i))
-                    LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
-                    x, y = GetDeltaLL(LS_file)
-                    plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-                    LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-                    x_stat, y_stat = GetDeltaLL(LS_file)
-                    plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-                    plt.legend(loc='upper right', fontsize=18, frameon=True)
-                    SetStyle(fig, x, cat_name, "", 8)
-                    WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.Significance.mH120.root')
-                    ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
-                    plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.png')
-                    plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.pdf')
-                    plt.close()
+                        plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
+                        LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                        x_stat, y_stat = GetDeltaLL(LS_file)
+                        plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                        plt.legend(loc='upper right', fontsize=18, frameon=True)
+                        SetStyle(fig, x, cat_name, "", 8)
+                        WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.Significance.mH120.root')
+                        ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
+                        plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.png')
+                        plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/DeltaNLL_{ver_short}_{cat_short}.pdf')
+                        plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -437,36 +452,37 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/{version}/{prd}/{feature}/Combination_Cat'
         print(" ### INFO: Saving combination in ", combdir)
-        if run: run_cmd('mkdir -p ' + combdir)
+        run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for category in categories:
             cat_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/{version}_{feature}_{category}_os_iso.txt'
-            cat_short = category.split("_cut_90_")[1]
-            cmd += f' {cat_short}={cat_file}'
-        cmd += f' > {version}_{feature}_os_iso.txt'
+            cmd += f' {GetCatShort(category)}={cat_file}'
+        cmd += f' > {combdir}/{version}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
+
+        if options.only_cards: return True
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
-        cmd = f'text2workspace.py {version}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
-        if run: run_cmd(cmd)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
-        if run: run_cmd(cmd)
+        cmd = f'cd {combdir} && text2workspace.py {combdir}/{version}_{feature}_os_iso.txt --channel-masks -o {combdir}/model.root &>{combdir}/text2workspace.log'
+        run_cmd(cmd, run)
+        cmd = f'combine -M MultiDimFit {combdir}/model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{combdir}/multiDimFit_singles.log'
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
-        if run: run_cmd(cmd)
-        cmd = f'combine -M Significance {version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}.log'
+        run_cmd(cmd, run)
+        cmd = f'combine -M Significance {combdir}/{version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> {combdir}/Significance_{version}_{feature}.log'
         if run: run_cmd(cmd)
 
-        cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
-            ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        if run: run_cmd(cmd)
-        cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
+        cmd = f'combine -M MultiDimFit {combdir}/model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
+            f' --preFitValue 1 --expectSignal 1 -t -1 &>{combdir}/MultiDimFit.log'
+        run_cmd(cmd, run)
+        cmd = f'combine -M MultiDimFit {combdir}/higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
-            '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        if run: run_cmd(cmd)
+            f'--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>{combdir}/MultiDimFit_statOnly.log'
+        run_cmd(cmd, run)
 
     if run_cat:
 
@@ -490,35 +506,37 @@ if __name__ == "__main__" :
                     for res in concurrent.futures.as_completed(futures):
                         res.result()
 
-        ############################################################################
-        print("\n ### INFO: Plot Combination of categories \n")
-        ############################################################################
+        if not options.only_cards:
 
-        for feature in features:
-            for version in versions:
-                fig = plt.figure(figsize=(10, 10))
-                cmap = plt.get_cmap('tab10')
-                for i, category in enumerate(categories):
-                    LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
+            ############################################################################
+            print("\n ### INFO: Plot Combination of categories \n")
+            ############################################################################
+
+            for feature in features:
+                for version in versions:
+                    fig = plt.figure(figsize=(10, 10))
+                    cmap = plt.get_cmap('tab10')
+                    for i, category in enumerate(categories):
+                        LS_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/higgsCombineTest.MultiDimFit.mH120.root'
+                        x, y = GetDeltaLL(LS_file)
+                        if "boosted" in category:        cat_name = r"Boosted"
+                        elif "resolved_1b" in category:  cat_name = r"Res 1b"
+                        elif "resolved_2b" in category:  cat_name = r"Res 2b"
+                        plt.plot(x, y, label=cat_name, linewidth=3, color=cmap(i))
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
                     x, y = GetDeltaLL(LS_file)
-                    if "boosted" in category:        cat_name = r"Boosted"
-                    elif "resolved_1b" in category:  cat_name = r"Res 1b"
-                    elif "resolved_2b" in category:  cat_name = r"Res 2b"
-                    plt.plot(x, y, label=cat_name, linewidth=3, color=cmap(i))
-                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
-                x, y = GetDeltaLL(LS_file)
-                plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-                x_stat, y_stat = GetDeltaLL(LS_file)
-                plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-                plt.legend(loc='upper right', fontsize=18, frameon=True)
-                year = version.split("ul_")[1].split("_Z")[0]
-                SetStyle(fig, x, year, "", 8)
-                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.Significance.mH120.root')
-                ver_short = version.split("ul_")[1].split("_Z")[0]
-                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')
-                plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.pdf')
-                plt.close()
+                    plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                    x_stat, y_stat = GetDeltaLL(LS_file)
+                    plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                    plt.legend(loc='upper right', fontsize=18, frameon=True)
+                    year = version.split("ul_")[1].split("_Z")[0]
+                    SetStyle(fig, x, year, "", 8)
+                    WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.Significance.mH120.root')
+                    ver_short = version.split("ul_")[1].split("_Z")[0]
+                    plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.png')
+                    plt.savefig(maindir + f'/{version}/{prd}/{feature}/Combination_Cat/DeltaNLL_{ver_short}.pdf')
+                    plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -529,7 +547,7 @@ if __name__ == "__main__" :
         version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
         combdir = maindir + f'/{version_comb}/{prd}/{feature}/'
         print(" ### INFO: Saving ZH combination in ", combdir)
-        if run: run_cmd('mkdir -p ' + combdir)
+        run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for version, short_name in [(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]:
@@ -537,27 +555,27 @@ if __name__ == "__main__" :
             cmd += f' {short_name}={cat_file}'
         cmd += f' > {version_comb}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
         cmd = f'text2workspace.py {version_comb}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M Significance {version_comb}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version_comb}_{feature}.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
     def split_versions_ZH():
         """ Split the input versions into ZbbHtt versions and ZttHbb versions """
@@ -594,33 +612,35 @@ if __name__ == "__main__" :
                     for res in concurrent.futures.as_completed(futures):
                         res.result()
         
-        ############################################################################
-        print("\n ### INFO: Plot Combination of ZH \n")
-        ############################################################################
+        if not options.only_cards:
 
-        for feature in features:
-            for version_ZbbHtt, version_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
-                version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
-                fig = plt.figure(figsize=(10, 10))
-                cmap = plt.get_cmap('tab10')
-                for i, (version, short_name) in enumerate([(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]):
-                    cat_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
-                    LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+            ############################################################################
+            print("\n ### INFO: Plot Combination of ZH \n")
+            ############################################################################
+
+            for feature in features:
+                for version_ZbbHtt, version_ZttHbb in zip(versions_ZbbHtt, versions_ZttHbb):
+                    version_comb = version_ZbbHtt.replace("ZbbHtt", "ZHComb")
+                    fig = plt.figure(figsize=(10, 10))
+                    cmap = plt.get_cmap('tab10')
+                    for i, (version, short_name) in enumerate([(version_ZbbHtt, "ZbbHtt"), (version_ZttHbb, "ZttHbb")]):
+                        cat_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
+                        LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                        x, y = GetDeltaLL(LS_file)
+                        plt.plot(x, y, label=short_name, linewidth=3, color=cmap(i))
+                    LS_file = maindir + f'/{version_comb}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
                     x, y = GetDeltaLL(LS_file)
-                    plt.plot(x, y, label=short_name, linewidth=3, color=cmap(i))
-                LS_file = maindir + f'/{version_comb}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
-                x, y = GetDeltaLL(LS_file)
-                plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-                LS_file = maindir + f'/{version_comb}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-                x_stat, y_stat = GetDeltaLL(LS_file)
-                plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-                plt.legend(loc='upper right', fontsize=18, frameon=True)
-                SetStyle(fig, x, "ZH Combination", "", 8)
-                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version_comb}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
-                ver_short = version.split("ul_")[1].split("_Z")[0]
-                plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.png')
-                plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.pdf')
-                plt.close()
+                    plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
+                    LS_file = maindir + f'/{version_comb}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                    x_stat, y_stat = GetDeltaLL(LS_file)
+                    plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                    plt.legend(loc='upper right', fontsize=18, frameon=True)
+                    SetStyle(fig, x, "ZH Combination", "", 8)
+                    WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/{version_comb}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+                    ver_short = version.split("ul_")[1].split("_Z")[0]
+                    plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.png')
+                    plt.savefig(maindir + f'/{version_comb}/{prd}/{feature}/DeltaNLL_{ver_short}.pdf')
+                    plt.close()
 
     ################################################################################################################################
     ################################################################################################################################
@@ -630,72 +650,67 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/FullRun2_{o_name}/{prd}/{feature}'
         print(" ### INFO: Saving combination in ", combdir)
-        if run: run_cmd('mkdir -p ' + combdir)
+        run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         for version in versions:
-            year = version.split("ul_")[1].split("_Z")[0]
             ver_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/{version}_{feature}_os_iso.txt'
             if os.path.exists(ver_file):
-                cmd += f' Y{year}={ver_file}'
+                cmd += f' Y{GetYear(version)}={ver_file}'
         cmd += f' > FullRun2_{o_name}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
-        print(cmd)
-        if run: run_cmd(cmd)
+        print('\n',cmd,'\n')
+        run_cmd(cmd, run)
+
+        if options.only_cards: return True
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
         cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
-        print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
-        print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         if True or options.singleThread:
             prefix_cmd = "combine "
         else: # weird things happen
             prefix_cmd = "combineTool.py --split-points 5 --job-mode=interactive --parallel=20 "
         cmd = prefix_cmd + f'-M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
-        print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
-        print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
-        print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
-        print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         if options.run_impacts or options.run_impacts_noMCStat:
             print(" ### INFO: Produce Full Run 2 Impact Plots")
 
             if not options.run_impacts_noMCStat:
                 cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 cmd = f'plotImpacts.py -i impacts.json -o Impacts_{o_name}_{feature}'
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 if run: run_cmd('mkdir -p impacts')
                 if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
 
             cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{o_name}_{feature}_NoMCstats'
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             if run: run_cmd('mkdir -p impacts_noMCstats')
             if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
 
@@ -718,29 +733,31 @@ if __name__ == "__main__" :
                     for res in concurrent.futures.as_completed(futures):
                         res.result()
 
-        ############################################################################
-        print("\n ### INFO: Plot Combination of years \n")
-        ############################################################################
+        if not options.only_cards:
 
-        for feature in features:
-            fig = plt.figure(figsize=(10, 10))
-            cmap = plt.get_cmap('tab10')
-            for i, version in enumerate(versions):
-                LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+            ############################################################################
+            print("\n ### INFO: Plot Combination of years \n")
+            ############################################################################
+
+            for feature in features:
+                fig = plt.figure(figsize=(10, 10))
+                cmap = plt.get_cmap('tab10')
+                for i, version in enumerate(versions):
+                    LS_file = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/higgsCombineTest.MultiDimFit.mH120.root'
+                    x, y = GetDeltaLL(LS_file)
+                    plt.plot(x, y, label=version.split("ul_")[1].split("_Z")[0], linewidth=3, color=cmap(i))
+                LS_file = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
                 x, y = GetDeltaLL(LS_file)
-                plt.plot(x, y, label=version.split("ul_")[1].split("_Z")[0], linewidth=3, color=cmap(i))
-            LS_file = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.MultiDimFit.mH120.root'
-            x, y = GetDeltaLL(LS_file)
-            plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
-            LS_file = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
-            x_stat, y_stat = GetDeltaLL(LS_file)
-            plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
-            plt.legend(loc='upper right', fontsize=18, frameon=True)
-            SetStyle(fig, x, fancy_name, "", 8)
-            WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
-            plt.savefig(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.png')
-            plt.savefig(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.pdf')
-            plt.close()
+                plt.plot(x, y, label='Combination', linewidth=3, color=cmap(i+1))
+                LS_file = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombine.scan.with_syst.statonly_correct.MultiDimFit.mH120.root'
+                x_stat, y_stat = GetDeltaLL(LS_file)
+                plt.plot(x_stat, y_stat, label='Stat-only', linewidth=3, linestyle='--', color=cmap(i+1))
+                plt.legend(loc='upper right', fontsize=18, frameon=True)
+                SetStyle(fig, x, fancy_name, "", 8)
+                WriteResults(fig, x, y, x_stat, y_stat, maindir + f'/FullRun2_{o_name}/{prd}/{feature}/higgsCombineTest.Significance.mH120.root')
+                plt.savefig(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.png')
+                plt.savefig(maindir + f'/FullRun2_{o_name}/{prd}/{feature}/DeltaNLL_FullRun2_{o_name}.pdf')
+                plt.close()
 
 
     ################################################################################################################################
@@ -751,7 +768,7 @@ if __name__ == "__main__" :
 
         combdir = maindir + f'/FullRun2_ZHComb/{prd}/{feature}'
         print(" ### INFO: Saving ZH FullRun2 combination in ", combdir)
-        if run: run_cmd('mkdir -p ' + combdir)
+        run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
         versions_ZbbHtt, versions_ZttHbb = split_versions_ZH()
@@ -768,59 +785,59 @@ if __name__ == "__main__" :
         cmd += f' > FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt'
         if run: os.chdir(combdir)
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         if "KinFit" in feature: r_range = r_range_comb_KinFit ; r_range_setPR = r_range_setPR_KinFit
         else:                   r_range = r_range_comb ; r_range_setPR = r_range_setPR_comb
     
         cmd = f'text2workspace.py FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M Significance FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
             ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
             '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
         print(cmd)
-        if run: run_cmd(cmd)
+        run_cmd(cmd, run)
 
         if options.run_impacts:
             print(" ### INFO: Produce Full Run 2 ZHComb Impact Plots")
 
             if not options.run_impacts_noMCStat:
                 cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
-                if run: run_cmd(cmd)
+                run_cmd(cmd, run)
                 cmd = f'plotImpacts.py -i impacts.json -o Impacts_{o_name}_{feature}'
-                if run: run_cmd(cmd)
-                if run: run_cmd('mkdir -p impacts')
-                if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
+                run_cmd(cmd, run)
+                run_cmd('mkdir -p impacts')
+                run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
 
             cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
-            if run: run_cmd(cmd)
+            run_cmd(cmd, run)
             cmd = f'plotImpacts.py -i impacts_noMCstats.json -o Impacts_{o_name}_{feature}_NoMCstats'
-            if run: run_cmd(cmd)
-            if run: run_cmd('mkdir -p impacts_noMCstats')
-            if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
+            run_cmd(cmd, run)
+            run_cmd('mkdir -p impacts_noMCstats')
+            run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts_noMCstats')
 
     if options.run_zh_comb_year:
 

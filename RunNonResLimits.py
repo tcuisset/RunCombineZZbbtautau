@@ -92,7 +92,7 @@ if __name__ == "__main__" :
     makeFlag("--only_cards",              dest="only_cards",            default=False,            help='Skip all combine commands and plot only')
     makeFlag("--move_eos",                dest="move_eos",              default=False,            help='Move results to eos')
     makeFlag("--singleThread",            dest="singleThread",          default=False,            help="Don't run in parallel, disable for debugging")
-    makeFlag("--unblind",                 dest="unblind",               default=False,            help="Picke the unblinded datacards and run unblinded limits")
+    makeFlag("--unblind",                 dest="unblind",               default=False,            help="Pick the unblinded datacards and run unblinded limits")
     options = parser.parse_args()
 
     if ',' in options.ver:  versions = options.ver.split(',')
@@ -117,6 +117,7 @@ if __name__ == "__main__" :
     run_zh_comb_cat = options.run_zh_comb_cat 
     run_year = options.run_year
     comb_2016 = options.comb_2016
+    unblind = options.unblind
 
     cmtdir = '/data_CMS/cms/' + options.user_cmt + '/cmt/CreateDatacards/'
     maindir = os.getcwd() + f'/NonRes{options.num}/'
@@ -205,8 +206,10 @@ if __name__ == "__main__" :
                     for channel in channels:
                         odir = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}'
                         run_cmd('mkdir -p ' + odir)
-                        ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.txt'
-                        ch_root = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.root'
+                        if not unblind:
+                            ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso.txt'
+                        else:
+                            ch_file = cmtdir + f'/{version}/{category}/{prd}/{feature}_{grp}_{channel}_os_iso__unblind.txt'
                         run_cmd(f'cp {ch_file} {odir}/{version}_{category}_{feature}_{grp}_{channel}_os_iso.txt')
 
     ################################################################################################################################

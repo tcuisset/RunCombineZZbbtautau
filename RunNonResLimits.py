@@ -118,6 +118,10 @@ if __name__ == "__main__" :
     run_year = options.run_year
     comb_2016 = options.comb_2016
     unblind = options.unblind
+    if not unblind: 
+        run_blind = '-t -1 --expectSignal 1'
+    else:
+        run_blind = ''
 
     cmtdir = '/data_CMS/cms/' + options.user_cmt + '/cmt/CreateDatacards/'
     maindir = os.getcwd() + f'/NonRes{options.num}/'
@@ -172,7 +176,9 @@ if __name__ == "__main__" :
         down_syst = np.sqrt(min_1sigma**2 - min_1sigma_stat**2)
         sig = GetLimit(sig_file)
 
-        text = fr"$\mu = 1.00^{{+{up_syst:.{round}f}}}_{{-{down_syst:.{round}f}}}(syst)^{{+{up_stat:.{round}f}}}_{{-{down_stat:.{round}f}}}(stat)$"
+        if not unblind: mu = '1.00'
+        else:           mu = f'{central:.{round}f}'
+        text = fr"$\mu = {mu}^{{+{up_syst:.{round}f}}}_{{-{down_syst:.{round}f}}}(syst)^{{+{up_stat:.{round}f}}}_{{-{down_stat:.{round}f}}}(stat)$"
         if sig: text += f"\nSignificance = {sig:.{round}f}$\sigma$"
         plt.text(0.03, 0.91, text, ha='left', va='top', transform=plt.gca().transAxes, fontsize='small',
             bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
@@ -290,7 +296,7 @@ if __name__ == "__main__" :
         run_cmd(cmd, run)
 
         print(" ### INFO: Run Delta Log Likelihood Scan")
-        cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{ch_dir}/multiDimFit.log'
+        cmd = f'cd {ch_dir} && combine -M MultiDimFit {ch_dir}/model.root --algo=grid --points 100 {r_range} --preFitValue 1 {run_blind} &>{ch_dir}/multiDimFit.log'
         run_cmd(cmd, run)
 
         LS_file = f'{ch_dir}/higgsCombineTest.MultiDimFit.mH120.root'
@@ -308,13 +314,13 @@ if __name__ == "__main__" :
 
             # Creates problems when parallelizing, but it's only to print out the significance so we can drop it
             print(" ### INFO: Run significance extraction")
-            cmd = f'cd {ch_dir} && combine -M Significance {datafile} -t -1 --expectSignal=1 --pvalue &> {ch_dir}/PValue.log'
+            cmd = f'cd {ch_dir} && combine -M Significance {datafile} {run_blind} --pvalue &> {ch_dir}/PValue.log'
             run_cmd(cmd, run)
             run_cmd(f'mv {ch_dir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.pvalue.root'
             a = GetLimit(LS_file)
 
-            cmd = f'cd {ch_dir} && combine -M Significance {datafile} -t -1 --expectSignal=1 &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
+            cmd = f'cd {ch_dir} && combine -M Significance {datafile} {run_blind} &> {ch_dir}/Significance_{ver_short}_{cat_short}_{ch}.log'
             run_cmd(cmd, run)
             run_cmd(f'mv {ch_dir}/higgsCombineTest.Significance.mH120.root {ch_dir}/higgsCombineTest.Significance.mH120.significance.root')
             LS_file = f'{ch_dir}/higgsCombineTest.Significance.mH120.significance.root'
@@ -374,18 +380,18 @@ if __name__ == "__main__" :
     
         cmd = f'text2workspace.py {version}_{feature}_{category}_os_iso.txt -o model.root &>{combdir}/text2workspace.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 {run_blind} &>multiDimFit_singles.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 {run_blind} &>multiDimFit_grid.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M Significance {version}_{feature}_{category}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version}_{feature}_{category}.log'
+        cmd = f'combine -M Significance {version}_{feature}_{category}_os_iso.txt {run_blind} &> Significance_{version}_{feature}_{category}.log'
         run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
-            ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
+            f' --preFitValue 1 {run_blind} &>MultiDimFit.log'
         run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
-            '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
+            f'--saveWorkspace --preFitValue 1 {run_blind} -n .scan.with_syst.statonly_correct --algo grid '\
             '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
         run_cmd(cmd, run)
 
@@ -472,18 +478,18 @@ if __name__ == "__main__" :
     
         cmd = f'cd {combdir} && text2workspace.py {combdir}/{version}_{feature}_os_iso.txt --channel-masks -o {combdir}/model.root &>{combdir}/text2workspace.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit {combdir}/model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>{combdir}/multiDimFit_singles.log'
+        cmd = f'combine -M MultiDimFit {combdir}/model.root --algo=singles {r_range} --preFitValue 1 {run_blind} &>{combdir}/multiDimFit_singles.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 {run_blind} &>multiDimFit_grid.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M Significance {combdir}/{version}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> {combdir}/Significance_{version}_{feature}.log'
-        if run: run_cmd(cmd)
+        cmd = f'combine -M Significance {combdir}/{version}_{feature}_os_iso.txt {run_blind} &> {combdir}/Significance_{version}_{feature}.log'
+        run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit {combdir}/model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
-            f' --preFitValue 1 --expectSignal 1 -t -1 &>{combdir}/MultiDimFit.log'
+            f' --preFitValue 1 {run_blind} &>{combdir}/MultiDimFit.log'
         run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit {combdir}/higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
-            '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
+            f'--saveWorkspace --preFitValue 1 {run_blind} -n .scan.with_syst.statonly_correct --algo grid '\
             f'--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>{combdir}/MultiDimFit_statOnly.log'
         run_cmd(cmd, run)
 
@@ -565,19 +571,19 @@ if __name__ == "__main__" :
     
         cmd = f'text2workspace.py {version_comb}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 {run_blind} &>multiDimFit_singles.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 {run_blind} &>multiDimFit_grid.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M Significance {version_comb}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{version_comb}_{feature}.log'
+        cmd = f'combine -M Significance {version_comb}_{feature}_os_iso.txt {run_blind} &> Significance_{version_comb}_{feature}.log'
         run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
-            ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
+            f' --preFitValue 1 {run_blind} &>MultiDimFit.log'
         run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
-            '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
-            '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
+            f'--saveWorkspace --preFitValue 1 {run_blind} -n .scan.with_syst.statonly_correct --algo grid '\
+            f'--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
         run_cmd(cmd, run)
 
     def split_versions_ZH():
@@ -672,32 +678,32 @@ if __name__ == "__main__" :
     
         cmd = f'text2workspace.py FullRun2_{o_name}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 {run_blind} &>multiDimFit_singles.log'
         run_cmd(cmd, run)
         if True or options.singleThread:
             prefix_cmd = "combine "
         else: # weird things happen
             prefix_cmd = "combineTool.py --split-points 5 --job-mode=interactive --parallel=20 "
-        cmd = prefix_cmd + f'-M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        cmd = prefix_cmd + f'-M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 {run_blind} &>multiDimFit_grid.log'
         run_cmd(cmd, run)
-        cmd = f'combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
+        cmd = f'combine -M Significance FullRun2_{o_name}_{feature}_os_iso.txt {run_blind} &> Significance_{feature}.log'
         run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
-            ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
+            f' --preFitValue 1 {run_blind} &>MultiDimFit.log'
         run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
-            '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
-            '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
+            f'--saveWorkspace --preFitValue 1 {run_blind} -n .scan.with_syst.statonly_correct --algo grid '\
+            f'--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
         run_cmd(cmd, run)
 
         if options.run_impacts or options.run_impacts_noMCStat:
             print(" ### INFO: Produce Full Run 2 Impact Plots")
 
             if not options.run_impacts_noMCStat:
-                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
+                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
                 run_cmd(cmd, run)
-                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
+                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doFits --robustFit 1 --parallel 50'
                 run_cmd(cmd, run)
                 cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
                 run_cmd(cmd, run)
@@ -706,9 +712,9 @@ if __name__ == "__main__" :
                 if run: run_cmd('mkdir -p impacts')
                 if run: run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
 
-            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
+            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
             run_cmd(cmd, run)
-            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
             run_cmd(cmd, run)
             cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
             run_cmd(cmd, run)
@@ -796,23 +802,23 @@ if __name__ == "__main__" :
         cmd = f'text2workspace.py FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt -o model.root &>text2workspace.log'
         print(cmd)
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_singles.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=singles {r_range} --preFitValue 1 {run_blind} &>multiDimFit_singles.log'
         print(cmd)
         run_cmd(cmd, run)
-        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 --expectSignal 1 -t -1 &>multiDimFit_grid.log'
+        cmd = f'combine -M MultiDimFit model.root --algo=grid --points 100 {r_range} --preFitValue 1 {run_blind} &>multiDimFit_grid.log'
         print(cmd)
         run_cmd(cmd, run)
-        cmd = f'combine -M Significance FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt -t -1 --expectSignal=1 &> Significance_{feature}.log'
+        cmd = f'combine -M Significance FullRun2_ZHComb_{o_name}_{feature}_os_iso.txt {run_blind} &> Significance_{feature}.log'
         print(cmd)
         run_cmd(cmd, run)
 
         cmd = f'combine -M MultiDimFit model.root -m 125 -n .bestfit.with_syst {r_range_setPR} --saveWorkspace'\
-            ' --preFitValue 1 --expectSignal 1 -t -1 &>MultiDimFit.log'
+            f' --preFitValue 1 {run_blind} &>MultiDimFit.log'
         print(cmd)
         run_cmd(cmd, run)
         cmd = f'combine -M MultiDimFit higgsCombine.bestfit.with_syst.MultiDimFit.mH125.root {r_range_setPR} '\
-            '--saveWorkspace --preFitValue 1 --expectSignal 1 -t -1 -n .scan.with_syst.statonly_correct --algo grid '\
-            '--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
+            f'--saveWorkspace --preFitValue 1 {run_blind} -n .scan.with_syst.statonly_correct --algo grid '\
+            f'--points 100 --snapshotName MultiDimFit --freezeParameters allConstrainedNuisances &>MultiDimFit_statOnly.log'
         print(cmd)
         run_cmd(cmd, run)
 
@@ -820,9 +826,9 @@ if __name__ == "__main__" :
             print(" ### INFO: Produce Full Run 2 ZHComb Impact Plots")
 
             if not options.run_impacts_noMCStat:
-                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
+                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' 
                 run_cmd(cmd, run)
-                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'
+                cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doFits --robustFit 1 --parallel 50'
                 run_cmd(cmd, run)
                 cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts.json --parallel 50'
                 run_cmd(cmd, run)
@@ -831,9 +837,9 @@ if __name__ == "__main__" :
                 run_cmd('mkdir -p impacts')
                 run_cmd('mv higgsCombine_paramFit* higgsCombine_initialFit* impacts')
 
-            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
+            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doInitialFit --robustFit 1 --parallel 50 ' +  r" --exclude 'rgx{prop_bin.+}'"
             run_cmd(cmd, run)
-            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --expectSignal 1 -t -1 --preFitValue 1 {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
+            cmd = f'combineTool.py -M Impacts -d model.root -m 125 --preFitValue 1 {run_blind} {r_range_setPR} --doFits --robustFit 1 --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
             run_cmd(cmd, run)
             cmd = 'combineTool.py -M Impacts -d model.root -m 125 -o impacts_noMCstats.json --parallel 50'+  r" --exclude 'rgx{prop_bin.+}'"
             run_cmd(cmd, run)

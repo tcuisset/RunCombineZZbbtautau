@@ -36,7 +36,9 @@ python3 RunAsymptoticLimits.py --ver ul_2016_HIPM_ZttHbb_v12,ul_2016_ZttHbb_v12,
 
 # comb_options = '--minimizerAlgo Minuit2'
 # comb_options = '--cminDefaultMinimizerType Minuit2'
-comb_options = ''
+comb_options = '--rAbsAcc 0.0000001'
+# default rAbsAcc is      0.0005
+# our best fit r can be very small (0.0002)
 
 def run_cmd(cmd, run=True, check=True):
     if run:
@@ -88,7 +90,7 @@ if __name__ == "__main__" :
     makeFlag("--plot_only",               dest="plot_only",             default=False,            help='Skip all combine commands and plot only')
     makeFlag("--move_eos",                dest="move_eos",              default=False,            help='Move results to eos')
     makeFlag("--singleThread",            dest="singleThread",          default=False,            help="Don't run in parallel, disable for debugging")
-    makeFlag("--featureDependsOnMass",    dest='featureDependsOnMass',  default=False,            help="Add _$MASS to name of feature for each mass for parametrized DNN")
+    makeFlag("--featureDependsOnMass",    dest='featureDependsOnMass',  default=False,            help="Replace $MASS in feature name by the resonance mass, for parametrized DNN (if no $MASS then append _$MASS)")
     options = parser.parse_args()
 
     if ',' in options.ver:  versions = options.ver.split(',')
@@ -115,6 +117,20 @@ if __name__ == "__main__" :
     run_cat = options.run_cat
     run_year = options.run_year
     featureDependsOnMass = options.featureDependsOnMass
+    def get_feature_name(feature:str, mass):
+        if featureDependsOnMass:
+            if "$MASS" in feature:
+                return feature.replace("$MASS", str(mass))
+            else:
+                return feature + "_" + mass
+        else:
+            return feature
+    def short_category(category:str):
+        try:
+            return category.split("_cut_90_")[1]
+        except IndexError:
+            return category.split("EC90_")[1]
+
     comb_2016 = options.comb_2016
 
     cmtdir = '/data_CMS/cms/' + options.user_cmt + '/cmt/CreateDatacards/'
@@ -218,13 +234,15 @@ if __name__ == "__main__" :
                         for mass in mass_points:
                             odir = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/M{mass}'
                             if run: run_cmd('mkdir -p ' + odir)
-                            if featureDependsOnMass: feat_name = f'{feature}_{mass}'
-                            else:                    feat_name = f'{feature}'
+                            feat_name = get_feature_name(feature, mass)
                             ch_file = cmtdir + f'/{version}/{category}/{prd}_M{mass}/{feat_name}_{grp}_{channel}_os_iso.txt'
                             ch_root = cmtdir + f'/{version}/{category}/{prd}_M{mass}/{feat_name}_{grp}_{channel}_os_iso.root'
+                            # ch_file = cmtdir + f'/{version}/{category}/{prd}_M{mass}/{feature}{mass}_500b_{grp}_{channel}_os_iso.txt'
+                            # ch_root = cmtdir + f'/{version}/{category}/{prd}_M{mass}/{feature}{mass}_500b_{grp}_{channel}_os_iso.root'
                             run_cmd(f'cp {ch_file} {odir}/{version}_{category}_{feat_name}_{grp}_{channel}_os_iso.txt')
                             run_cmd(f'cp {ch_root} {odir}')
 
+    #features = [feature.replace("$MASS", "") for feature in features]
     ################################################################################################################################
     ################################################################################################################################
     ################################################################################################################################
@@ -247,8 +265,7 @@ if __name__ == "__main__" :
                 print(" ### INFO: Saving combination in ", combdir)
                 if run: run_cmd('mkdir -p ' + combdir)
 
-                if featureDependsOnMass: feat_name = f'{feature}_{mass}'
-                else:                    feat_name = f'{feature}'
+                feat_name = get_feature_name(feature, mass)
                 cmd = f'combineCards.py'
                 for version in [v_2016, v_2016_HIPM]:
                     year_file = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/M{mass}/{version}_{category}_{feat_name}_{grp}_{channel}_os_iso.txt'
@@ -296,8 +313,7 @@ if __name__ == "__main__" :
 
     def run_single_limit(maindir, feature, version, prd, category, mass, channel, featureDependsOnMass):
 
-        if featureDependsOnMass: feat_name = f'{feature}_{mass}'
-        else:                    feat_name = f'{feature}'
+        feat_name = get_feature_name(feature, mass)
 
         odir = maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/M{mass}'
         run_cmd('mkdir -p ' + odir)
@@ -373,7 +389,7 @@ if __name__ == "__main__" :
                         plt.fill_between(np.asarray(mass), np.asarray(p2s_t), np.asarray(m2s_t), 
                             color = '#85D1FBff', label = "95% expected", zorder=1)
                         SetStyle(p2s_t, x_axis, process_tex, version, line1=cat_name+"\n"+dict_ch_name[channel])
-                        ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
+                        ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = short_category(category)
                         plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/Limits_{ver_short}_{cat_short}_{channel}.pdf')
                         plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/Limits_{ver_short}_{cat_short}_{channel}.png')
                         # print(maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/Limits_{ver_short}_{cat_short}_{channel}.png')
@@ -385,19 +401,19 @@ if __name__ == "__main__" :
 
     def run_comb_channels(maindir, cmtdir, feature, version, prd, category, mass, featureDependsOnMass):
 
-        if featureDependsOnMass: feat_name = f'{feature}_{mass}'
-        else:                    feat_name = f'{feature}'
+        feat_name = get_feature_name(feature, mass)
 
         combdir = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/M{mass}'
         print(" ### INFO: Saving combination in ", combdir)
         if run: run_cmd('mkdir -p ' + combdir)
 
         cmd = f'combineCards.py'
-        for ch in channels:
+        for channel in channels:
             # FIrst check if we have limits for individual channel
             ch_file = cmtdir + f'/{version}/{category}/{prd}_M{mass}/{feat_name}_{grp}_{ch}_os_iso.txt'
+            #ch_file = cmtdir + f'/{version}/{category}/{prd}_M{mass}/{feature}{mass}_500b_{grp}_{channel}_os_iso.txt'
             if CheckLimits(maindir + f'/{version}/{prd}/{feature}/{category}/{channel}/M{mass}/limits.json') and os.path.isfile(ch_file): # check expected
-                cmd += f' {ch}={ch_file}'
+                cmd += f' {channel}={ch_file}'
             else:
                 print(f"## WARNING : comb_channels : skipping {version}/{prd}/{category}/{channel}/M{mass}")
         if not "=" in cmd:
@@ -467,7 +483,7 @@ if __name__ == "__main__" :
                     plt.fill_between(np.asarray(mass), np.asarray(p2s_t), np.asarray(m2s_t), 
                         color = '#85D1FBff', label = "95% expected", zorder=1)
                     SetStyle(p2s_t, x_axis, process_tex, version, line1=cat_name)
-                    ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = category.split("_cut_90_")[1]
+                    ver_short = version.split("ul_")[1].split("_Z")[0] ; cat_short = short_category(category)
                     plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/Limits_{ver_short}_{cat_short}.pdf')
                     plt.savefig(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/Limits_{ver_short}_{cat_short}.png')
                     # print(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/Limits_{ver_short}_{cat_short}.png')
@@ -490,8 +506,7 @@ if __name__ == "__main__" :
 
     def run_comb_categories(maindir, cmtdir, feature, version, prd, mass, featureDependsOnMass):
 
-        if featureDependsOnMass:    feat_name = f'{feature}_{mass}'
-        else:                       feat_name = f'{feature}'
+        feat_name = get_feature_name(feature, mass)
 
         combdir = maindir + f'/{version}/{prd}/{feature}/Combination_Cat/M{mass}'
         print(" ### INFO: Saving combination in ", combdir)
@@ -501,7 +516,7 @@ if __name__ == "__main__" :
         for category in categories:
             cat_file = maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/M{mass}/{version}_{feature}_{category}_os_iso.txt'
             if CheckLimits(maindir + f'/{version}/{prd}/{feature}/{category}/Combination_Ch/M{mass}/limits.json') and os.path.isfile(cat_file): # check expected
-                cat_short = category.split("_cut_90_")[1]
+                cat_short = short_category(category)
                 cmd += f' {cat_short}={cat_file}'
             else:
                 print(f"## WARNING : comb_categories: skipping {version}/{prd}/{category}/Combination_Ch/M{mass}")
@@ -696,9 +711,6 @@ if __name__ == "__main__" :
     ##########################################################
 
     def run_comb_years(maindir, cmtdir, feature, prd, mass, featureDependsOnMass):
-
-        if featureDependsOnMass:    feat_name = f'{feature}_{mass}'
-        else:                       feat_name = f'{feature}'
 
         combdir = maindir + f'/FullRun2_{o_name}/{prd}/{feature}/M{mass}'
         print(" ### INFO: Saving combination in ", combdir)
